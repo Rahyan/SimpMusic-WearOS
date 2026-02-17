@@ -91,6 +91,30 @@ fun AccountsScreen(
     val restorePlaybackStateEnabled =
         dataStoreManager.saveStateOfPlayback.collectAsStateWithLifecycle(initialValue = DataStoreManager.FALSE).value ==
             DataStoreManager.TRUE
+    val sendBackToGoogleEnabled =
+        dataStoreManager.sendBackToGoogle.collectAsStateWithLifecycle(initialValue = DataStoreManager.FALSE).value ==
+            DataStoreManager.TRUE
+    val sponsorBlockEnabled =
+        dataStoreManager.sponsorBlockEnabled.collectAsStateWithLifecycle(initialValue = DataStoreManager.FALSE).value ==
+            DataStoreManager.TRUE
+    val preferVideoEnabled =
+        dataStoreManager.watchVideoInsteadOfPlayingAudio.collectAsStateWithLifecycle(initialValue = DataStoreManager.FALSE).value ==
+            DataStoreManager.TRUE
+    val killServiceOnExitEnabled =
+        dataStoreManager.killServiceOnExit.collectAsStateWithLifecycle(initialValue = DataStoreManager.TRUE).value ==
+            DataStoreManager.TRUE
+    val backupDownloadedEnabled =
+        dataStoreManager.backupDownloaded.collectAsStateWithLifecycle(initialValue = DataStoreManager.FALSE).value ==
+            DataStoreManager.TRUE
+    val autoCheckForUpdatesEnabled =
+        dataStoreManager.autoCheckForUpdates.collectAsStateWithLifecycle(initialValue = DataStoreManager.TRUE).value ==
+            DataStoreManager.TRUE
+    val spotifyLyricsEnabled =
+        dataStoreManager.spotifyLyrics.collectAsStateWithLifecycle(initialValue = DataStoreManager.FALSE).value ==
+            DataStoreManager.TRUE
+    val spotifyCanvasEnabled =
+        dataStoreManager.spotifyCanvas.collectAsStateWithLifecycle(initialValue = DataStoreManager.FALSE).value ==
+            DataStoreManager.TRUE
 
     fun requestPhoneSync() {
         val appCtx = context.applicationContext
@@ -348,6 +372,119 @@ fun AccountsScreen(
                 onToggle = {
                     scope.launch {
                         dataStoreManager.setEndlessQueue(!endlessQueueEnabled)
+                    }
+                },
+            )
+        }
+
+        item {
+            SettingToggleRow(
+                title = "Send watch-time to Google",
+                subtitle = "Send playback watch-time updates back to YouTube.",
+                enabled = sendBackToGoogleEnabled,
+                onToggle = {
+                    scope.launch {
+                        dataStoreManager.setSendBackToGoogle(!sendBackToGoogleEnabled)
+                    }
+                },
+            )
+        }
+
+        item {
+            SettingToggleRow(
+                title = "SponsorBlock",
+                subtitle = "Skip community-marked sponsored segments when available.",
+                enabled = sponsorBlockEnabled,
+                onToggle = {
+                    scope.launch {
+                        dataStoreManager.setSponsorBlockEnabled(!sponsorBlockEnabled)
+                    }
+                },
+            )
+        }
+
+        item {
+            SettingToggleRow(
+                title = "Prefer video over audio",
+                subtitle = "Use video stream path instead of pure audio when possible.",
+                enabled = preferVideoEnabled,
+                onToggle = {
+                    scope.launch {
+                        dataStoreManager.setWatchVideoInsteadOfPlayingAudio(!preferVideoEnabled)
+                    }
+                },
+            )
+        }
+
+        item {
+            SettingToggleRow(
+                title = "Kill service on exit",
+                subtitle = "Stop background player service when app exits.",
+                enabled = killServiceOnExitEnabled,
+                onToggle = {
+                    scope.launch {
+                        dataStoreManager.setKillServiceOnExit(!killServiceOnExitEnabled)
+                    }
+                },
+            )
+        }
+
+        item {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Ecosystem",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+
+        item {
+            SettingToggleRow(
+                title = "Spotify lyrics",
+                subtitle = "Enable Spotify lyrics provider fallback.",
+                enabled = spotifyLyricsEnabled,
+                onToggle = {
+                    scope.launch {
+                        dataStoreManager.setSpotifyLyrics(!spotifyLyricsEnabled)
+                    }
+                },
+            )
+        }
+
+        item {
+            SettingToggleRow(
+                title = "Spotify canvas",
+                subtitle = "Enable Spotify canvas artwork support.",
+                enabled = spotifyCanvasEnabled,
+                onToggle = {
+                    scope.launch {
+                        dataStoreManager.setSpotifyCanvas(!spotifyCanvasEnabled)
+                    }
+                },
+            )
+        }
+
+        item {
+            SettingToggleRow(
+                title = "Backup downloaded media",
+                subtitle = "Include downloaded files in backup/restore flows.",
+                enabled = backupDownloadedEnabled,
+                onToggle = {
+                    scope.launch {
+                        dataStoreManager.setBackupDownloaded(!backupDownloadedEnabled)
+                    }
+                },
+            )
+        }
+
+        item {
+            SettingToggleRow(
+                title = "Auto-check updates",
+                subtitle = "Automatically check app updates in supported channels.",
+                enabled = autoCheckForUpdatesEnabled,
+                onToggle = {
+                    scope.launch {
+                        dataStoreManager.setAutoCheckForUpdates(!autoCheckForUpdatesEnabled)
                     }
                 },
             )
