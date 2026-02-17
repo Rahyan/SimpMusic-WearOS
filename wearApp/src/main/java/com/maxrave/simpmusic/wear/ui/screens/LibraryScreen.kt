@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -240,6 +242,14 @@ fun LibraryScreen(
 
         item { Spacer(Modifier.height(8.dp)) }
 
+        item {
+            Text(
+                text = "Local playlists",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
         if (playlists == null) {
             item {
                 WearLoadingState("Loading library...")
@@ -275,7 +285,10 @@ private fun PlaylistRow(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(vertical = 8.dp),
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(16.dp),
+                ).padding(horizontal = 10.dp, vertical = 10.dp),
     ) {
         Text(
             text = playlist.title,

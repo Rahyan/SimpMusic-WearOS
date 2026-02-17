@@ -1,6 +1,7 @@
 package com.maxrave.simpmusic.wear.ui.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.AccountCircle
@@ -21,6 +23,7 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.MaterialTheme
+import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -334,7 +337,11 @@ private fun MiniPlayerHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 6.dp),
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(18.dp),
+                )
+                .padding(horizontal = 10.dp, vertical = 10.dp),
     ) {
         Text(
             text = title,
@@ -373,15 +380,12 @@ private fun MiniPlayerHeader(
 
         Spacer(Modifier.height(6.dp))
 
-        Text(
-            text = "Open queue",
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-            modifier =
-                Modifier
-                    .clickable(onClick = onOpenQueue)
-                    .padding(vertical = 4.dp),
-        )
+        FilledTonalButton(
+            onClick = onOpenQueue,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text("Open queue")
+        }
     }
 }
 
@@ -396,7 +400,10 @@ private fun ContentRow(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(vertical = 8.dp),
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(16.dp),
+                ).padding(horizontal = 10.dp, vertical = 10.dp),
     ) {
         Text(
             text = content.title,

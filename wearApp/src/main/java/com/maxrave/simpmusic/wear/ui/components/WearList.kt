@@ -26,7 +26,7 @@ fun WearList(
     modifier: Modifier = Modifier,
     state: LazyListState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() },
     // Leave room for `TimeText()` in `AppScaffold`.
-    contentPadding: PaddingValues = PaddingValues(start = 12.dp, end = 12.dp, top = 28.dp, bottom = 28.dp),
+    contentPadding: PaddingValues = PaddingValues(start = 12.dp, end = 12.dp, top = 30.dp, bottom = 32.dp),
     content: LazyListScope.() -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -48,7 +48,7 @@ fun WearList(
                     .focusable(),
             state = state,
             contentPadding = contentPadding,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             content = content,
         )
 

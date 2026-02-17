@@ -1,12 +1,15 @@
 package com.maxrave.simpmusic.wear.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -68,26 +71,35 @@ fun HomeScreen(
 
     WearList(state = listState) {
         item {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        if (artist.isNotBlank()) {
-            item {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            shape = RoundedCornerShape(18.dp),
+                        ).padding(horizontal = 10.dp, vertical = 10.dp),
+            ) {
                 Text(
-                    text = artist,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (artist.isNotBlank()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = artist,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
 
-        item { Spacer(Modifier.height(10.dp)) }
+        item { Spacer(Modifier.height(4.dp)) }
 
         item {
             Row(
