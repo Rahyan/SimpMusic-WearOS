@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.Album
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LibraryMusic
@@ -66,6 +67,8 @@ fun LibraryScreen(
     openLikedAlbums: () -> Unit,
     openFollowedReleases: () -> Unit,
     openLikedPlaylists: () -> Unit,
+    openFavoritePodcasts: () -> Unit,
+    openDownloadedCollections: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -175,6 +178,26 @@ fun LibraryScreen(
                     label = "Playlists",
                     icon = Icons.AutoMirrored.Filled.QueueMusic,
                     onClick = openLikedPlaylists,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                QuickActionChip(
+                    label = "Podcasts",
+                    icon = Icons.Filled.LibraryMusic,
+                    onClick = openFavoritePodcasts,
+                    modifier = Modifier.weight(1f),
+                )
+                QuickActionChip(
+                    label = "Collections",
+                    icon = Icons.Filled.Download,
+                    onClick = openDownloadedCollections,
                     modifier = Modifier.weight(1f),
                 )
             }

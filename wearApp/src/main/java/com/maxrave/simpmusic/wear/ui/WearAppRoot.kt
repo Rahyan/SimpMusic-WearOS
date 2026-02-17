@@ -31,7 +31,9 @@ import com.maxrave.simpmusic.wear.ui.screens.AccountsScreen
 import com.maxrave.simpmusic.wear.ui.screens.AlbumBrowseScreen
 import com.maxrave.simpmusic.wear.ui.screens.ArtistBrowseScreen
 import com.maxrave.simpmusic.wear.ui.screens.DiscoverScreen
+import com.maxrave.simpmusic.wear.ui.screens.DownloadedCollectionsScreen
 import com.maxrave.simpmusic.wear.ui.screens.DownloadsScreen
+import com.maxrave.simpmusic.wear.ui.screens.FavoritePodcastsScreen
 import com.maxrave.simpmusic.wear.ui.screens.FollowedArtistsScreen
 import com.maxrave.simpmusic.wear.ui.screens.FollowedReleasesScreen
 import com.maxrave.simpmusic.wear.ui.screens.HomeScreen
@@ -43,6 +45,7 @@ import com.maxrave.simpmusic.wear.ui.screens.LoginScreen
 import com.maxrave.simpmusic.wear.ui.screens.NowPlayingScreen
 import com.maxrave.simpmusic.wear.ui.screens.OnlinePlaylistsScreen
 import com.maxrave.simpmusic.wear.ui.screens.PlaylistScreen
+import com.maxrave.simpmusic.wear.ui.screens.PodcastEpisodesScreen
 import com.maxrave.simpmusic.wear.ui.screens.QueueScreen
 import com.maxrave.simpmusic.wear.ui.screens.RecentlyPlayedScreen
 import com.maxrave.simpmusic.wear.ui.screens.SearchScreen
@@ -64,6 +67,9 @@ private object Routes {
     const val LIKED_ALBUMS = "liked_albums"
     const val FOLLOWED_RELEASES = "followed_releases"
     const val LIKED_PLAYLISTS = "liked_playlists"
+    const val FAVORITE_PODCASTS = "favorite_podcasts"
+    const val PODCAST_EPISODES = "podcast_episodes"
+    const val DOWNLOADED_COLLECTIONS = "downloaded_collections"
     const val NOW_PLAYING = "now_playing"
     const val QUEUE = "queue"
     const val LIBRARY = "library"
@@ -231,6 +237,8 @@ fun WearAppRoot(mediaPlayerHandler: MediaPlayerHandler) {
                     openLikedAlbums = { navController.navigate(Routes.LIKED_ALBUMS) },
                     openFollowedReleases = { navController.navigate(Routes.FOLLOWED_RELEASES) },
                     openLikedPlaylists = { navController.navigate(Routes.LIKED_PLAYLISTS) },
+                    openFavoritePodcasts = { navController.navigate(Routes.FAVORITE_PODCASTS) },
+                    openDownloadedCollections = { navController.navigate(Routes.DOWNLOADED_COLLECTIONS) },
                 )
             }
             composable(Routes.LIKED_SONGS) {
@@ -273,6 +281,32 @@ fun WearAppRoot(mediaPlayerHandler: MediaPlayerHandler) {
                     onBack = { navController.popBackStack() },
                     openPlaylist = { playlistId -> navController.navigate("${Routes.YT_PLAYLIST}/${encodeNavArg(playlistId)}") },
                 )
+            }
+            composable(Routes.FAVORITE_PODCASTS) {
+                FavoritePodcastsScreen(
+                    onBack = { navController.popBackStack() },
+                    openPodcast = { podcastId -> navController.navigate("${Routes.PODCAST_EPISODES}/${encodeNavArg(podcastId)}") },
+                )
+            }
+            composable(Routes.DOWNLOADED_COLLECTIONS) {
+                DownloadedCollectionsScreen(
+                    onBack = { navController.popBackStack() },
+                    openAlbum = { albumId -> navController.navigate("${Routes.ALBUM}/${encodeNavArg(albumId)}") },
+                    openPlaylist = { playlistId -> navController.navigate("${Routes.YT_PLAYLIST}/${encodeNavArg(playlistId)}") },
+                    openLocalPlaylist = { playlistId -> navController.navigate("${Routes.PLAYLIST}/${encodeNavArg(playlistId.toString())}") },
+                    openPodcast = { podcastId -> navController.navigate("${Routes.PODCAST_EPISODES}/${encodeNavArg(podcastId)}") },
+                )
+            }
+            composable("${Routes.PODCAST_EPISODES}/{id}") { entry ->
+                val id = decodeNavArg(entry.arguments?.getString("id"))
+                if (!id.isNullOrBlank()) {
+                    PodcastEpisodesScreen(
+                        podcastId = id,
+                        mediaPlayerHandler = mediaPlayerHandler,
+                        onBack = { navController.popBackStack() },
+                        openNowPlaying = { navController.navigate(Routes.NOW_PLAYING) },
+                    )
+                }
             }
             composable("${Routes.PLAYLIST}/{id}") { entry ->
                 val id = decodeNavArg(entry.arguments?.getString("id"))?.toLongOrNull()
