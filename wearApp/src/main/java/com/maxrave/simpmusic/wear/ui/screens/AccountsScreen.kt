@@ -33,6 +33,10 @@ import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.repository.AccountRepository
 import com.maxrave.domain.repository.CommonRepository
 import com.maxrave.simpmusic.wear.auth.WearAccountManager
+import com.maxrave.simpmusic.wear.ui.theme.ACCENT_PRESET_DYNAMIC
+import com.maxrave.simpmusic.wear.ui.theme.KEY_WEAR_ACCENT_PRESET
+import com.maxrave.simpmusic.wear.ui.theme.accentPresetLabel
+import com.maxrave.simpmusic.wear.ui.theme.nextAccentPreset
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -118,6 +122,10 @@ fun AccountsScreen(
     val spotifySpdc =
         dataStoreManager.spdc.collectAsStateWithLifecycle(initialValue = "").value
     val spotifyLinked = spotifySpdc.isNotBlank()
+    val accentPreset =
+        dataStoreManager.getString(KEY_WEAR_ACCENT_PRESET)
+            .collectAsStateWithLifecycle(initialValue = ACCENT_PRESET_DYNAMIC)
+            .value ?: ACCENT_PRESET_DYNAMIC
 
     fun requestPhoneSync() {
         val appCtx = context.applicationContext
@@ -201,6 +209,47 @@ fun AccountsScreen(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
+        }
+
+        item {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "Appearance",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+
+        item {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val next = nextAccentPreset(accentPreset)
+                            scope.launch {
+                                dataStoreManager.putString(KEY_WEAR_ACCENT_PRESET, next)
+                                Toast
+                                    .makeText(
+                                        context,
+                                        "Accent: ${accentPresetLabel(next)}",
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                            }
+                        }.padding(vertical = 8.dp),
+            ) {
+                Text(
+                    text = "Material You accent",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    text = "${accentPresetLabel(accentPreset)} • tap to cycle",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
 
