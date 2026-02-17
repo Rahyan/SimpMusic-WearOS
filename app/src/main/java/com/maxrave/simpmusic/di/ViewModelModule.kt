@@ -17,6 +17,7 @@ import com.maxrave.simpmusic.viewModel.RecentlySongsViewModel
 import com.maxrave.simpmusic.viewModel.SearchViewModel
 import com.maxrave.simpmusic.viewModel.SettingsViewModel
 import com.maxrave.simpmusic.viewModel.SharedViewModel
+import com.maxrave.simpmusic.viewModel.WatchCompanionViewModel
 import org.koin.android.ext.koin.androidApplication
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
@@ -88,6 +89,17 @@ val viewModelModule =
         viewModel {
             SettingsViewModel(
                 application = androidApplication(),
+                get(),
+                get(),
+                get(),
+                get(),
+                get(),
+            )
+        }
+        viewModel {
+            WatchCompanionViewModel(
+                application = androidApplication(),
+                get(),
                 get(),
                 get(),
                 get(),

@@ -115,6 +115,7 @@ import com.maxrave.simpmusic.ui.component.EndOfPage
 import com.maxrave.simpmusic.ui.component.RippleIconButton
 import com.maxrave.simpmusic.ui.component.SettingItem
 import com.maxrave.simpmusic.ui.navigation.destination.home.CreditDestination
+import com.maxrave.simpmusic.ui.navigation.destination.home.WatchCompanionDestination
 import com.maxrave.simpmusic.ui.navigation.destination.login.LoginDestination
 import com.maxrave.simpmusic.ui.navigation.destination.login.SpotifyLoginDestination
 import com.maxrave.simpmusic.ui.theme.DarkColors
@@ -311,6 +312,13 @@ fun SettingScreen(
                     onClick = {
                         viewModel.getAllGoogleAccount()
                         showYouTubeAccountDialog = true
+                    },
+                )
+                SettingItem(
+                    title = stringResource(R.string.watch_companion),
+                    subtitle = stringResource(R.string.watch_companion_description),
+                    onClick = {
+                        navController.navigate(WatchCompanionDestination)
                     },
                 )
                 SettingItem(

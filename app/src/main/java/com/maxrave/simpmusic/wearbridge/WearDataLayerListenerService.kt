@@ -10,6 +10,7 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.maxrave.common.WearCompanionBridge
 import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.common.R as CommonR
 import kotlinx.coroutines.CoroutineScope
@@ -17,7 +18,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import org.koin.core.context.GlobalContext
+import java.time.LocalTime
+import java.time.temporal.ChronoUnit
 
 private const val PATH_OPEN_LOGIN_ON_PHONE = "/simpmusic/login/open"
 private const val PATH_SYNC_LOGIN_FROM_PHONE = "/simpmusic/login/sync"
@@ -33,6 +37,7 @@ class WearDataLayerListenerService : WearableListenerService() {
         when (messageEvent.path) {
             PATH_OPEN_LOGIN_ON_PHONE -> postLoginNotification(sourceNodeId = messageEvent.sourceNodeId)
             PATH_SYNC_LOGIN_FROM_PHONE -> syncExistingLoginToWatch(sourceNodeId = messageEvent.sourceNodeId)
+            WearCompanionBridge.PATH_RESPONSE -> onCompanionResponse(messageEvent)
             else -> return
         }
     }
@@ -130,6 +135,31 @@ class WearDataLayerListenerService : WearableListenerService() {
                 PATH_LOGIN_STATUS,
                 "$status|$message".toByteArray(),
             )
+    }
+
+    private fun onCompanionResponse(messageEvent: MessageEvent) {
+        val payload = runCatching { messageEvent.data.decodeToString() }.getOrNull().orEmpty()
+        if (payload.isBlank()) return
+        scope.launch {
+            val dataStoreManager = runCatching { GlobalContext.get().get<DataStoreManager>() }.getOrNull() ?: return@launch
+            dataStoreManager.putString(WearCompanionBridge.KEY_LAST_RESPONSE, payload)
+
+            val response = runCatching { JSONObject(payload) }.getOrNull()
+            if (response?.optString("action") == WearCompanionBridge.ACTION_STATUS) {
+                dataStoreManager.putString(WearCompanionBridge.KEY_LAST_DIAGNOSTICS, payload)
+            }
+
+            val message = response?.optString("message").orEmpty().ifBlank { payload }
+            val currentLog = dataStoreManager.getString(WearCompanionBridge.KEY_LOG).first().orEmpty()
+            val timestamp = LocalTime.now().truncatedTo(ChronoUnit.SECONDS)
+            val updatedLog =
+                if (currentLog.isBlank()) {
+                    "[$timestamp] $message"
+                } else {
+                    "$currentLog\n[$timestamp] $message"
+                }
+            dataStoreManager.putString(WearCompanionBridge.KEY_LOG, updatedLog.takeLast(16000))
+        }
     }
 
     private fun createNotificationChannel() {

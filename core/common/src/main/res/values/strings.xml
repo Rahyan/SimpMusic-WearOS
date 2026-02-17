@@ -127,6 +127,8 @@
     <string name="queue">Queue</string>
     <string name="recently">Recently</string>
     <string name="settings">Settings</string>
+    <string name="watch_companion">Watch Companion</string>
+    <string name="watch_companion_description">Manage watch sync, remote controls, and diagnostics</string>
     <string name="now_playing_upper">NOW PLAYING</string>
     <string name="language">Language</string>
     <string name="what_do_you_want_to_listen_to">What do you want to listen to?</string>
