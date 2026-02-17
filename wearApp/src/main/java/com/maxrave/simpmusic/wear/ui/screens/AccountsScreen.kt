@@ -115,6 +115,9 @@ fun AccountsScreen(
     val spotifyCanvasEnabled =
         dataStoreManager.spotifyCanvas.collectAsStateWithLifecycle(initialValue = DataStoreManager.FALSE).value ==
             DataStoreManager.TRUE
+    val spotifySpdc =
+        dataStoreManager.spdc.collectAsStateWithLifecycle(initialValue = "").value
+    val spotifyLinked = spotifySpdc.isNotBlank()
 
     fun requestPhoneSync() {
         val appCtx = context.applicationContext
@@ -439,10 +442,27 @@ fun AccountsScreen(
         }
 
         item {
+            Text(
+                text = if (spotifyLinked) "Spotify account linked" else "Spotify not linked (use phone app)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        item {
             SettingToggleRow(
                 title = "Spotify lyrics",
-                subtitle = "Enable Spotify lyrics provider fallback.",
+                subtitle =
+                    if (spotifyLinked) {
+                        "Enable Spotify lyrics provider fallback."
+                    } else {
+                        "Requires Spotify login in phone app first."
+                    },
                 enabled = spotifyLyricsEnabled,
+                isInteractive = spotifyLinked,
+                onDisabledClick = {
+                    Toast.makeText(context, "Link Spotify from phone app first", Toast.LENGTH_SHORT).show()
+                },
                 onToggle = {
                     scope.launch {
                         dataStoreManager.setSpotifyLyrics(!spotifyLyricsEnabled)
@@ -454,8 +474,17 @@ fun AccountsScreen(
         item {
             SettingToggleRow(
                 title = "Spotify canvas",
-                subtitle = "Enable Spotify canvas artwork support.",
+                subtitle =
+                    if (spotifyLinked) {
+                        "Enable Spotify canvas artwork support."
+                    } else {
+                        "Requires Spotify login in phone app first."
+                    },
                 enabled = spotifyCanvasEnabled,
+                isInteractive = spotifyLinked,
+                onDisabledClick = {
+                    Toast.makeText(context, "Link Spotify from phone app first", Toast.LENGTH_SHORT).show()
+                },
                 onToggle = {
                     scope.launch {
                         dataStoreManager.setSpotifyCanvas(!spotifyCanvasEnabled)
@@ -497,13 +526,23 @@ private fun SettingToggleRow(
     title: String,
     subtitle: String,
     enabled: Boolean,
+    isInteractive: Boolean = true,
+    onDisabledClick: (() -> Unit)? = null,
     onToggle: () -> Unit,
 ) {
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onToggle)
+                .clickable(
+                    onClick = {
+                        if (isInteractive) {
+                            onToggle()
+                        } else {
+                            onDisabledClick?.invoke()
+                        }
+                    },
+                )
                 .padding(vertical = 8.dp),
     ) {
         Row(
@@ -514,9 +553,15 @@ private fun SettingToggleRow(
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
+                color = if (isInteractive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = if (enabled) "On" else "Off",
+                text =
+                    if (isInteractive) {
+                        if (enabled) "On" else "Off"
+                    } else {
+                        "Unavailable"
+                    },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
