@@ -37,6 +37,7 @@ import com.maxrave.simpmusic.wear.ui.screens.FollowedReleasesScreen
 import com.maxrave.simpmusic.wear.ui.screens.HomeScreen
 import com.maxrave.simpmusic.wear.ui.screens.LibraryScreen
 import com.maxrave.simpmusic.wear.ui.screens.LikedAlbumsScreen
+import com.maxrave.simpmusic.wear.ui.screens.LikedPlaylistsScreen
 import com.maxrave.simpmusic.wear.ui.screens.LikedSongsScreen
 import com.maxrave.simpmusic.wear.ui.screens.LoginScreen
 import com.maxrave.simpmusic.wear.ui.screens.NowPlayingScreen
@@ -62,6 +63,7 @@ private object Routes {
     const val FOLLOWED_ARTISTS = "followed_artists"
     const val LIKED_ALBUMS = "liked_albums"
     const val FOLLOWED_RELEASES = "followed_releases"
+    const val LIKED_PLAYLISTS = "liked_playlists"
     const val NOW_PLAYING = "now_playing"
     const val QUEUE = "queue"
     const val LIBRARY = "library"
@@ -228,6 +230,7 @@ fun WearAppRoot(mediaPlayerHandler: MediaPlayerHandler) {
                     openFollowedArtists = { navController.navigate(Routes.FOLLOWED_ARTISTS) },
                     openLikedAlbums = { navController.navigate(Routes.LIKED_ALBUMS) },
                     openFollowedReleases = { navController.navigate(Routes.FOLLOWED_RELEASES) },
+                    openLikedPlaylists = { navController.navigate(Routes.LIKED_PLAYLISTS) },
                 )
             }
             composable(Routes.LIKED_SONGS) {
@@ -263,6 +266,12 @@ fun WearAppRoot(mediaPlayerHandler: MediaPlayerHandler) {
                     onBack = { navController.popBackStack() },
                     openAlbum = { albumId -> navController.navigate("${Routes.ALBUM}/${encodeNavArg(albumId)}") },
                     openArtist = { artistId -> navController.navigate("${Routes.ARTIST}/${encodeNavArg(artistId)}") },
+                )
+            }
+            composable(Routes.LIKED_PLAYLISTS) {
+                LikedPlaylistsScreen(
+                    onBack = { navController.popBackStack() },
+                    openPlaylist = { playlistId -> navController.navigate("${Routes.YT_PLAYLIST}/${encodeNavArg(playlistId)}") },
                 )
             }
             composable("${Routes.PLAYLIST}/{id}") { entry ->

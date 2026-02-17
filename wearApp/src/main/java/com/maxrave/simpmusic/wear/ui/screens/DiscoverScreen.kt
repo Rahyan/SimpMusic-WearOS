@@ -49,6 +49,7 @@ import com.maxrave.domain.repository.HomeRepository
 import com.maxrave.domain.utils.Resource
 import com.maxrave.simpmusic.wear.ui.components.PlaybackControlIcon
 import com.maxrave.simpmusic.wear.ui.components.QuickActionChip
+import com.maxrave.simpmusic.wear.ui.components.WearEmptyState
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import com.maxrave.simpmusic.wear.ui.components.WearErrorState
 import com.maxrave.simpmusic.wear.ui.components.WearLoadingState
@@ -209,57 +210,83 @@ fun DiscoverScreen(
         when (homeRes) {
             is Resource.Success -> {
                 val items = (homeRes as Resource.Success<List<HomeItem>>).data.orEmpty()
-                items.forEach { section ->
-                    val sectionTitle = section.title
+                if (items.isEmpty()) {
                     item {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = section.title,
-                            style = MaterialTheme.typography.titleSmall,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
+                        Spacer(Modifier.height(12.dp))
+                        WearEmptyState(
+                            title = "No recommendations available.",
+                            hint = "Tap refresh or check Accounts sign-in.",
                         )
-                        if (!section.subtitle.isNullOrBlank()) {
+                    }
+                } else {
+                    items.forEach { section ->
+                        val sectionTitle = section.title
+                        item {
+                            Spacer(Modifier.height(8.dp))
                             Text(
-                                text = section.subtitle.orEmpty(),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
+                                text = section.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                            if (!section.subtitle.isNullOrBlank()) {
+                                Text(
+                                    text = section.subtitle.orEmpty(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
-                    }
 
-                    val contents =
-                        section.contents
-                            .filterNotNull()
-                            .take(6)
+                        val contents =
+                            section.contents
+                                .filterNotNull()
+                                .take(6)
 
-                    contents.forEach { content ->
-                        item {
-                            ContentRow(
-                                content = content,
-                                onClick = {
-                                    when {
-                                        !content.videoId.isNullOrBlank() -> {
-                                            selectedTrack = content.toTrack()
-                                        }
-                                        !content.playlistId.isNullOrBlank() -> openYtPlaylist(content.playlistId!!)
-                                        !content.browseId.isNullOrBlank() -> {
-                                            val browseId = content.browseId!!
-                                            val shouldOpenArtist =
-                                                sectionTitle.contains("artist", ignoreCase = true) ||
-                                                    browseId.isArtistBrowseId()
-                                            if (shouldOpenArtist) {
-                                                openArtist(browseId)
-                                            } else {
-                                                openAlbum(browseId)
+                        contents.forEach { content ->
+                            item {
+                                ContentRow(
+                                    content = content,
+                                    onClick = {
+                                        when {
+                                            !content.videoId.isNullOrBlank() -> {
+                                                selectedTrack = content.toTrack()
                                             }
+                                            !content.playlistId.isNullOrBlank() -> {
+                                                val playlistId = content.playlistId!!
+                                                when (
+                                                    resolveDiscoverBrowseTarget(
+                                                        id = playlistId,
+                                                        sectionTitle = sectionTitle,
+                                                        defaultTarget = DiscoverBrowseTarget.PLAYLIST,
+                                                    )
+                                                ) {
+                                                    DiscoverBrowseTarget.ARTIST -> openArtist(playlistId)
+                                                    DiscoverBrowseTarget.ALBUM -> openAlbum(playlistId)
+                                                    DiscoverBrowseTarget.PLAYLIST -> openYtPlaylist(playlistId.toPlaylistId())
+                                                }
+                                            }
+                                            !content.browseId.isNullOrBlank() -> {
+                                                val browseId = content.browseId!!
+                                                when (
+                                                    resolveDiscoverBrowseTarget(
+                                                        id = browseId,
+                                                        sectionTitle = sectionTitle,
+                                                        defaultTarget = DiscoverBrowseTarget.ALBUM,
+                                                    )
+                                                ) {
+                                                    DiscoverBrowseTarget.ARTIST -> openArtist(browseId)
+                                                    DiscoverBrowseTarget.ALBUM -> openAlbum(browseId)
+                                                    DiscoverBrowseTarget.PLAYLIST -> openYtPlaylist(browseId.toPlaylistId())
+                                                }
+                                            }
+                                            else -> Unit
                                         }
-                                        else -> Unit
-                                    }
-                                },
-                            )
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -412,3 +439,40 @@ private fun String.isArtistBrowseId(): Boolean =
     this.startsWith("UC") ||
         this.startsWith("MPLAUC") ||
         this.startsWith("FEmusic_library_privately_owned_artist")
+
+private enum class DiscoverBrowseTarget {
+    ARTIST,
+    ALBUM,
+    PLAYLIST,
+}
+
+private fun resolveDiscoverBrowseTarget(
+    id: String,
+    sectionTitle: String,
+    defaultTarget: DiscoverBrowseTarget,
+): DiscoverBrowseTarget =
+    when {
+        id.isArtistBrowseId() || sectionTitle.isArtistSectionTitle() -> DiscoverBrowseTarget.ARTIST
+        id.isAlbumBrowseId() -> DiscoverBrowseTarget.ALBUM
+        id.isPlaylistBrowseId() -> DiscoverBrowseTarget.PLAYLIST
+        else -> defaultTarget
+    }
+
+private fun String.isAlbumBrowseId(): Boolean =
+    this.startsWith("MPRE") || this.startsWith("OLAK5uy_")
+
+private fun String.isPlaylistBrowseId(): Boolean =
+    this.startsWith("VL") ||
+        this.startsWith("PL") ||
+        this.startsWith("RD") ||
+        this.startsWith("UU") ||
+        this.startsWith("LM")
+
+private fun String.isArtistSectionTitle(): Boolean = this.contains("artist", ignoreCase = true)
+
+private fun String.toPlaylistId(): String =
+    when {
+        this.startsWith("VL") -> this
+        this.isPlaylistBrowseId() -> "VL$this"
+        else -> this
+    }

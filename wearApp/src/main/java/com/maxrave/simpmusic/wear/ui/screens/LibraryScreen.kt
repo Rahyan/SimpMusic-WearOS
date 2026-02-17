@@ -65,6 +65,7 @@ fun LibraryScreen(
     openFollowedArtists: () -> Unit,
     openLikedAlbums: () -> Unit,
     openFollowedReleases: () -> Unit,
+    openLikedPlaylists: () -> Unit,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -168,6 +169,12 @@ fun LibraryScreen(
                     label = "Releases",
                     icon = Icons.Filled.LibraryMusic,
                     onClick = openFollowedReleases,
+                    modifier = Modifier.weight(1f),
+                )
+                QuickActionChip(
+                    label = "Playlists",
+                    icon = Icons.AutoMirrored.Filled.QueueMusic,
+                    onClick = openLikedPlaylists,
                     modifier = Modifier.weight(1f),
                 )
             }
