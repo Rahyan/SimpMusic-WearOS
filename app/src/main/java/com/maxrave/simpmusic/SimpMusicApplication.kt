@@ -6,6 +6,11 @@ import android.database.CursorWindow
 import android.util.Log
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.work.Configuration
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import cat.ereza.customactivityoncrash.config.CaocConfig
 import coil3.ImageLoader
@@ -19,6 +24,7 @@ import coil3.util.DebugLogger
 import com.maxrave.data.di.loader.loadAllModules
 import com.maxrave.logger.Logger
 import com.maxrave.simpmusic.di.viewModelModule
+import com.maxrave.simpmusic.wearbridge.WatchCompanionAutoSyncWorker
 import com.maxrave.simpmusic.ui.MainActivity
 import com.maxrave.simpmusic.ui.theme.newDiskCache
 import okhttp3.OkHttpClient
@@ -29,6 +35,7 @@ import org.koin.core.context.loadKoinModules
 import org.koin.core.context.startKoin
 import org.koin.core.logger.Level
 import java.lang.reflect.Field
+import java.util.concurrent.TimeUnit
 
 class SimpMusicApplication :
     Application(),
@@ -72,6 +79,7 @@ class SimpMusicApplication :
 
         // initialize WorkManager
         WorkManager.initialize(this, workConfig)
+        scheduleWatchCompanionAutoSync()
 
         CaocConfig.Builder
             .create()
@@ -97,6 +105,27 @@ class SimpMusicApplication :
         super.onTerminate()
 
         Logger.w("Terminate", "Checking")
+    }
+
+    private fun scheduleWatchCompanionAutoSync() {
+        val constraints =
+            Constraints
+                .Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .setRequiresBatteryNotLow(true)
+                .build()
+        val request =
+            PeriodicWorkRequestBuilder<WatchCompanionAutoSyncWorker>(
+                6,
+                TimeUnit.HOURS,
+            ).setConstraints(constraints)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
+                .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            WatchCompanionAutoSyncWorker.UNIQUE_WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
     }
 }
 

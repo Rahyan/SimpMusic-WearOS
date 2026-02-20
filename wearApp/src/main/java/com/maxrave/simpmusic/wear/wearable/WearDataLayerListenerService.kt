@@ -37,6 +37,8 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import org.koin.core.context.GlobalContext
+import java.time.LocalTime
+import java.time.temporal.ChronoUnit
 
 private const val KEY_WEAR_LOGIN_STATUS = "wear_login_status"
 private const val KEY_WEAR_LOGIN_MESSAGE = "wear_login_message"
@@ -51,6 +53,7 @@ class WearDataLayerListenerService : WearableListenerService() {
             PATH_LOGIN_COOKIE -> onCookie(messageEvent)
             PATH_LOGIN_STATUS -> onStatus(messageEvent)
             WearCompanionBridge.PATH_REQUEST -> onCompanionRequest(messageEvent)
+            WearCompanionBridge.PATH_RESPONSE -> onCompanionResponse(messageEvent)
             else -> return
         }
     }
@@ -155,6 +158,33 @@ class WearDataLayerListenerService : WearableListenerService() {
                 )
             }
         }
+    }
+
+    private fun onCompanionResponse(messageEvent: MessageEvent) {
+        val payload = runCatching { messageEvent.data.decodeToString() }.getOrNull().orEmpty()
+        if (payload.isBlank()) return
+        scope.launch {
+            val dataStoreManager: DataStoreManager = GlobalContext.get().get()
+            dataStoreManager.putString(WearCompanionBridge.KEY_LAST_RESPONSE, payload)
+            val response = runCatching { JSONObject(payload) }.getOrNull()
+            if (response?.optString("action") == WearCompanionBridge.ACTION_STATUS) {
+                dataStoreManager.putString(WearCompanionBridge.KEY_LAST_DIAGNOSTICS, payload)
+            }
+            appendCompanionLog(response?.optString("message").orEmpty().ifBlank { payload })
+        }
+    }
+
+    private suspend fun appendCompanionLog(message: String) {
+        val dataStoreManager: DataStoreManager = GlobalContext.get().get()
+        val current = dataStoreManager.getString(WearCompanionBridge.KEY_LOG).first().orEmpty()
+        val timestamp = LocalTime.now().truncatedTo(ChronoUnit.SECONDS)
+        val updated =
+            if (current.isBlank()) {
+                "[$timestamp] $message"
+            } else {
+                "$current\n[$timestamp] $message"
+            }
+        dataStoreManager.putString(WearCompanionBridge.KEY_LOG, updated.takeLast(16000))
     }
 
     private suspend fun handleStatus(

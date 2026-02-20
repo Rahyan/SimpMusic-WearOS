@@ -32,10 +32,14 @@ fun WatchCompanionScreen(
     val context = LocalContext.current
     val connection by viewModel.connectionState.collectAsStateWithLifecycle()
     val syncSelection by viewModel.syncSelection.collectAsStateWithLifecycle()
+    val autoSyncPolicy by viewModel.autoSyncPolicy.collectAsStateWithLifecycle()
+    val autoSyncStats by viewModel.autoSyncStatsSummary.collectAsStateWithLifecycle()
     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
     val lastResponse by viewModel.lastResponse.collectAsStateWithLifecycle()
     val logs by viewModel.logText.collectAsStateWithLifecycle()
     val syncing by viewModel.syncing.collectAsStateWithLifecycle()
+    val actionState by viewModel.actionState.collectAsStateWithLifecycle()
+    val controlsLocked = actionState.inProgress || syncing
 
     Column {
         TopAppBar(
@@ -72,6 +76,7 @@ fun WatchCompanionScreen(
                 SettingItem(
                     title = "Request diagnostics",
                     subtitle = "Fetch watch health, app version, and playback state",
+                    isEnable = !controlsLocked,
                     onClick = { viewModel.requestDiagnostics() },
                 )
             }
@@ -79,7 +84,28 @@ fun WatchCompanionScreen(
                 SettingItem(
                     title = "Sync phone session + Spotify",
                     subtitle = "Send phone account cookie + Spotify tokens to watch",
+                    isEnable = !controlsLocked,
                     onClick = { viewModel.syncSessionAndSpotify() },
+                )
+            }
+            item("action_status") {
+                SettingItem(
+                    title = if (actionState.inProgress) "Working: ${actionState.activeAction}" else "Bridge action status",
+                    subtitle =
+                        when {
+                            actionState.lastFailure.isNotBlank() -> "Last failure: ${actionState.lastFailure}"
+                            actionState.lastSuccess.isNotBlank() -> "Last success: ${actionState.lastSuccess}"
+                            else -> "No companion action executed yet."
+                        },
+                    isEnable = false,
+                )
+            }
+            item("action_retry") {
+                SettingItem(
+                    title = "Retry last failed action",
+                    subtitle = "Repeat the latest failed bridge command",
+                    isEnable = actionState.retryAvailable && !actionState.inProgress,
+                    onClick = { viewModel.retryLastFailedAction() },
                 )
             }
 
@@ -90,6 +116,7 @@ fun WatchCompanionScreen(
                 SettingItem(
                     title = "Liked songs",
                     subtitle = "Sync liked songs library snapshot",
+                    isEnable = !controlsLocked,
                     switch = (syncSelection.songs to { viewModel.setSongsSync(it) }),
                 )
             }
@@ -97,6 +124,7 @@ fun WatchCompanionScreen(
                 SettingItem(
                     title = "Liked playlists",
                     subtitle = "Sync liked playlists library snapshot",
+                    isEnable = !controlsLocked,
                     switch = (syncSelection.playlists to { viewModel.setPlaylistsSync(it) }),
                 )
             }
@@ -104,6 +132,7 @@ fun WatchCompanionScreen(
                 SettingItem(
                     title = "Liked albums",
                     subtitle = "Sync liked albums library snapshot",
+                    isEnable = !controlsLocked,
                     switch = (syncSelection.albums to { viewModel.setAlbumsSync(it) }),
                 )
             }
@@ -111,6 +140,7 @@ fun WatchCompanionScreen(
                 SettingItem(
                     title = "Followed artists",
                     subtitle = "Sync followed artists library snapshot",
+                    isEnable = !controlsLocked,
                     switch = (syncSelection.artists to { viewModel.setArtistsSync(it) }),
                 )
             }
@@ -118,6 +148,7 @@ fun WatchCompanionScreen(
                 SettingItem(
                     title = "Favorite podcasts",
                     subtitle = "Sync favorite podcasts library snapshot",
+                    isEnable = !controlsLocked,
                     switch = (syncSelection.podcasts to { viewModel.setPodcastsSync(it) }),
                 )
             }
@@ -125,15 +156,50 @@ fun WatchCompanionScreen(
                 SettingItem(
                     title = "Download metadata",
                     subtitle = "Sync downloaded/downloading state for songs and collections",
+                    isEnable = !controlsLocked,
                     switch = (syncSelection.downloads to { viewModel.setDownloadsSync(it) }),
                 )
             }
             item("sync_now") {
                 SettingItem(
-                    title = if (syncing) "Syncing..." else "Sync now",
+                    title = if (controlsLocked) "Syncing..." else "Sync now",
                     subtitle = "Push selected snapshots to watch",
-                    isEnable = !syncing,
+                    isEnable = !controlsLocked,
                     onClick = { viewModel.syncSelectedData() },
+                )
+            }
+            item("auto_sync_header") {
+                Text("Auto-sync policy", style = typo.labelMedium, modifier = Modifier.padding(vertical = 8.dp))
+            }
+            item("auto_sync_battery_saver") {
+                SettingItem(
+                    title = "Battery saver mode",
+                    subtitle = "Only auto-sync while charging to cut idle drain",
+                    isEnable = !controlsLocked,
+                    switch = (autoSyncPolicy.batterySaver to { viewModel.setAutoSyncBatterySaver(it) }),
+                )
+            }
+            item("auto_sync_unmetered") {
+                SettingItem(
+                    title = "Wi-Fi only auto-sync",
+                    subtitle = "Skip periodic auto-sync on metered/mobile data",
+                    isEnable = !controlsLocked,
+                    switch = (autoSyncPolicy.unmeteredOnly to { viewModel.setAutoSyncUnmeteredOnly(it) }),
+                )
+            }
+            item("auto_sync_stats") {
+                SettingItem(
+                    title = "Auto-sync delta stats",
+                    subtitle = autoSyncStats,
+                    isEnable = false,
+                )
+            }
+            item("auto_sync_reset") {
+                SettingItem(
+                    title = "Reset delta sync cache",
+                    subtitle = "Force next auto-sync to resend all categories",
+                    isEnable = !controlsLocked,
+                    onClick = { viewModel.resetAutoSyncDeltaCache() },
                 )
             }
 
@@ -153,6 +219,7 @@ fun WatchCompanionScreen(
                 SettingItem(
                     title = title,
                     subtitle = "Send command to watch player",
+                    isEnable = !controlsLocked,
                     onClick = action,
                 )
             }

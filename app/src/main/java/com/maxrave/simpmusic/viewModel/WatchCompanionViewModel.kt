@@ -45,6 +45,19 @@ data class WatchSyncSelection(
     val downloads: Boolean = true,
 )
 
+data class WatchCompanionActionState(
+    val inProgress: Boolean = false,
+    val activeAction: String = "",
+    val lastSuccess: String = "",
+    val lastFailure: String = "",
+    val retryAvailable: Boolean = false,
+)
+
+data class WatchAutoSyncPolicyUiState(
+    val batterySaver: Boolean = false,
+    val unmeteredOnly: Boolean = false,
+)
+
 class WatchCompanionViewModel(
     application: Application,
     private val dataStoreManager: DataStoreManager,
@@ -76,6 +89,14 @@ class WatchCompanionViewModel(
     private val _syncing = MutableStateFlow(false)
     val syncing: StateFlow<Boolean> = _syncing.asStateFlow()
 
+    private val _actionState = MutableStateFlow(WatchCompanionActionState())
+    val actionState: StateFlow<WatchCompanionActionState> = _actionState.asStateFlow()
+    private val _autoSyncPolicy = MutableStateFlow(WatchAutoSyncPolicyUiState())
+    val autoSyncPolicy: StateFlow<WatchAutoSyncPolicyUiState> = _autoSyncPolicy.asStateFlow()
+    private val _autoSyncStatsSummary = MutableStateFlow("No auto-sync run yet.")
+    val autoSyncStatsSummary: StateFlow<String> = _autoSyncStatsSummary.asStateFlow()
+    private var lastFailedActionId: String? = null
+
     init {
         observeBridgeState()
         refreshConnection()
@@ -105,6 +126,42 @@ class WatchCompanionViewModel(
         _syncSelection.value = _syncSelection.value.copy(downloads = enabled)
     }
 
+    fun setAutoSyncBatterySaver(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.putString(
+                WearCompanionBridge.KEY_AUTO_SYNC_BATTERY_SAVER,
+                if (enabled) DataStoreManager.TRUE else DataStoreManager.FALSE,
+            )
+        }
+    }
+
+    fun setAutoSyncUnmeteredOnly(enabled: Boolean) {
+        viewModelScope.launch {
+            dataStoreManager.putString(
+                WearCompanionBridge.KEY_AUTO_SYNC_UNMETERED_ONLY,
+                if (enabled) DataStoreManager.TRUE else DataStoreManager.FALSE,
+            )
+        }
+    }
+
+    fun resetAutoSyncDeltaCache() {
+        viewModelScope.launch {
+            listOf(
+                WearCompanionBridge.KEY_AUTO_SYNC_SIG_SESSION,
+                WearCompanionBridge.KEY_AUTO_SYNC_SIG_SONGS,
+                WearCompanionBridge.KEY_AUTO_SYNC_SIG_PLAYLISTS,
+                WearCompanionBridge.KEY_AUTO_SYNC_SIG_ALBUMS,
+                WearCompanionBridge.KEY_AUTO_SYNC_SIG_ARTISTS,
+                WearCompanionBridge.KEY_AUTO_SYNC_SIG_PODCASTS,
+                WearCompanionBridge.KEY_AUTO_SYNC_SIG_DOWNLOADS,
+            ).forEach { key ->
+                dataStoreManager.putString(key, "")
+            }
+            dataStoreManager.putString(WearCompanionBridge.KEY_AUTO_SYNC_LAST_STATS, "")
+            makeToast("Auto-sync delta cache reset.")
+        }
+    }
+
     fun refreshConnection() {
         viewModelScope.launch {
             val nodes = getConnectedNodes()
@@ -118,150 +175,213 @@ class WatchCompanionViewModel(
 
     fun requestDiagnostics() {
         viewModelScope.launch {
-            val sent =
-                sendSimpleAction(
-                    action = WearCompanionBridge.ACTION_STATUS,
-                    payload = JSONObject(),
-                )
-            if (sent) {
-                appendLog("Diagnostics requested.")
+            runTrackedAction(ACTION_ID_DIAGNOSTICS, "Request diagnostics") {
+                val sent =
+                    sendSimpleAction(
+                        action = WearCompanionBridge.ACTION_STATUS,
+                        payload = JSONObject(),
+                    )
+                if (sent) {
+                    ActionOutcome(success = true, detail = "Watch diagnostics request delivered.", toast = "Diagnostics requested.")
+                } else {
+                    ActionOutcome(success = false, detail = "Watch is unreachable for diagnostics request.")
+                }
             }
         }
     }
 
     fun syncSessionAndSpotify() {
         viewModelScope.launch {
-            val cookie = dataStoreManager.cookie.first()
-            if (cookie.isBlank()) {
-                makeToast("No phone session found. Sign in on phone first.")
-                appendLog("Session sync skipped: no cookie.")
-                return@launch
-            }
+            runTrackedAction(ACTION_ID_SESSION_SYNC, "Sync phone session + Spotify") {
+                val cookie = dataStoreManager.cookie.first()
+                if (cookie.isBlank()) {
+                    ActionOutcome(
+                        success = false,
+                        detail = "No phone session cookie available.",
+                        toast = "No phone session found. Sign in on phone first.",
+                    )
+                } else {
+                    val payload =
+                        JSONObject()
+                            .put("cookie", cookie)
+                            .put("spdc", dataStoreManager.spdc.first())
+                            .put("spotifyClientToken", dataStoreManager.spotifyClientToken.first())
+                            .put("spotifyClientTokenExpires", dataStoreManager.spotifyClientTokenExpires.first())
+                            .put("spotifyPersonalToken", dataStoreManager.spotifyPersonalToken.first())
+                            .put("spotifyPersonalTokenExpires", dataStoreManager.spotifyPersonalTokenExpires.first())
+                            .put("spotifyLyrics", dataStoreManager.spotifyLyrics.first() == DataStoreManager.TRUE)
+                            .put("spotifyCanvas", dataStoreManager.spotifyCanvas.first() == DataStoreManager.TRUE)
 
-            val payload =
-                JSONObject()
-                    .put("cookie", cookie)
-                    .put("spdc", dataStoreManager.spdc.first())
-                    .put("spotifyClientToken", dataStoreManager.spotifyClientToken.first())
-                    .put("spotifyClientTokenExpires", dataStoreManager.spotifyClientTokenExpires.first())
-                    .put("spotifyPersonalToken", dataStoreManager.spotifyPersonalToken.first())
-                    .put("spotifyPersonalTokenExpires", dataStoreManager.spotifyPersonalTokenExpires.first())
-                    .put("spotifyLyrics", dataStoreManager.spotifyLyrics.first() == DataStoreManager.TRUE)
-                    .put("spotifyCanvas", dataStoreManager.spotifyCanvas.first() == DataStoreManager.TRUE)
-
-            val sent = sendSimpleAction(WearCompanionBridge.ACTION_SYNC_SESSION, payload)
-            if (sent) {
-                makeToast("Session sync sent to watch.")
-                appendLog("Sent session + Spotify token sync.")
+                    val sent = sendSimpleAction(WearCompanionBridge.ACTION_SYNC_SESSION, payload)
+                    if (sent) {
+                        ActionOutcome(success = true, detail = "Session + Spotify payload delivered.", toast = "Session sync sent to watch.")
+                    } else {
+                        ActionOutcome(success = false, detail = "Watch is unreachable for session sync.")
+                    }
+                }
             }
         }
     }
 
     fun syncSelectedData() {
         viewModelScope.launch {
-            val node = getPrimaryNode() ?: run {
-                makeToast("No watch connected.")
-                appendLog("Selective sync failed: no connected watch.")
-                refreshConnection()
-                return@launch
-            }
-
-            _syncing.value = true
-            try {
-                val selected = syncSelection.value
-                val requestId = UUID.randomUUID().toString()
-                var sentCount = 0
-
-                if (selected.songs) {
-                    songRepository.getLikedSongs().first().take(MAX_SYNC_ITEMS).forEach { song ->
-                        if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_SONG, requestId, songToJson(song))) {
-                            sentCount++
-                        }
-                    }
-                }
-                if (selected.playlists) {
-                    playlistRepository.getLikedPlaylists().first().take(MAX_SYNC_ITEMS).forEach { playlist ->
-                        if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_PLAYLIST, requestId, playlistToJson(playlist))) {
-                            sentCount++
-                        }
-                    }
-                }
-                if (selected.albums) {
-                    albumRepository.getLikedAlbums().first().take(MAX_SYNC_ITEMS).forEach { album ->
-                        if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_ALBUM, requestId, albumToJson(album))) {
-                            sentCount++
-                        }
-                    }
-                }
-                if (selected.artists) {
-                    artistRepository.getFollowedArtists().first().take(MAX_SYNC_ITEMS).forEach { artist ->
-                        if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_ARTIST, requestId, artistToJson(artist.channelId, artist.name, artist.thumbnails, artist.followed))) {
-                            sentCount++
-                        }
-                    }
-                }
-                if (selected.podcasts) {
-                    podcastRepository.getFavoritePodcasts().first().take(MAX_SYNC_ITEMS).forEach { podcast ->
-                        if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_PODCAST, requestId, podcastToJson(podcast))) {
-                            sentCount++
-                        }
-                    }
-                }
-                if (selected.downloads) {
-                    val downloadPayload = buildDownloadPayload()
-                    if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_DOWNLOAD, requestId, downloadPayload)) {
-                        sentCount++
-                    }
+            runTrackedAction(ACTION_ID_SELECTIVE_SYNC, "Sync selected library data") {
+                val node = getPrimaryNode() ?: run {
+                    refreshConnection()
+                    return@runTrackedAction ActionOutcome(
+                        success = false,
+                        detail = "No connected watch for selective sync.",
+                        toast = "No watch connected.",
+                    )
                 }
 
-                appendLog("Selective sync sent ($sentCount payloads).")
-                makeToast("Selective sync sent.")
-            } finally {
-                _syncing.value = false
+                _syncing.value = true
+                try {
+                    val selected = syncSelection.value
+                    val requestId = UUID.randomUUID().toString()
+                    var sentCount = 0
+                    var attemptedCount = 0
+
+                    if (selected.songs) {
+                        songRepository.getLikedSongs().first().take(MAX_SYNC_ITEMS).forEach { song ->
+                            attemptedCount++
+                            if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_SONG, requestId, songToJson(song))) {
+                                sentCount++
+                            }
+                        }
+                    }
+                    if (selected.playlists) {
+                        playlistRepository.getLikedPlaylists().first().take(MAX_SYNC_ITEMS).forEach { playlist ->
+                            attemptedCount++
+                            if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_PLAYLIST, requestId, playlistToJson(playlist))) {
+                                sentCount++
+                            }
+                        }
+                    }
+                    if (selected.albums) {
+                        albumRepository.getLikedAlbums().first().take(MAX_SYNC_ITEMS).forEach { album ->
+                            attemptedCount++
+                            if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_ALBUM, requestId, albumToJson(album))) {
+                                sentCount++
+                            }
+                        }
+                    }
+                    if (selected.artists) {
+                        artistRepository.getFollowedArtists().first().take(MAX_SYNC_ITEMS).forEach { artist ->
+                            attemptedCount++
+                            if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_ARTIST, requestId, artistToJson(artist.channelId, artist.name, artist.thumbnails, artist.followed))) {
+                                sentCount++
+                            }
+                        }
+                    }
+                    if (selected.podcasts) {
+                        podcastRepository.getFavoritePodcasts().first().take(MAX_SYNC_ITEMS).forEach { podcast ->
+                            attemptedCount++
+                            if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_PODCAST, requestId, podcastToJson(podcast))) {
+                                sentCount++
+                            }
+                        }
+                    }
+                    if (selected.downloads) {
+                        val downloadPayload = buildDownloadPayload()
+                        attemptedCount++
+                        if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_DOWNLOAD, requestId, downloadPayload)) {
+                            sentCount++
+                        }
+                    }
+
+                    if (attemptedCount == 0) {
+                        ActionOutcome(
+                            success = false,
+                            detail = "No sync categories selected.",
+                            toast = "Select at least one category to sync.",
+                        )
+                    } else if (sentCount == attemptedCount) {
+                        ActionOutcome(
+                            success = true,
+                            detail = "All payloads delivered ($sentCount/$attemptedCount).",
+                            toast = "Selective sync sent.",
+                        )
+                    } else {
+                        ActionOutcome(
+                            success = false,
+                            detail = "Only $sentCount/$attemptedCount payloads delivered. Retry suggested.",
+                            toast = "Sync partial: $sentCount/$attemptedCount delivered.",
+                        )
+                    }
+                } finally {
+                    _syncing.value = false
+                }
             }
         }
     }
 
-    fun remotePlayPause() = remoteCommand(WearCompanionBridge.REMOTE_PLAY_PAUSE)
+    fun remotePlayPause() = remoteCommand(ACTION_ID_REMOTE_PLAY_PAUSE, "Remote Play/Pause", WearCompanionBridge.REMOTE_PLAY_PAUSE)
 
-    fun remoteNext() = remoteCommand(WearCompanionBridge.REMOTE_NEXT)
+    fun remoteNext() = remoteCommand(ACTION_ID_REMOTE_NEXT, "Remote Next", WearCompanionBridge.REMOTE_NEXT)
 
-    fun remotePrevious() = remoteCommand(WearCompanionBridge.REMOTE_PREVIOUS)
+    fun remotePrevious() = remoteCommand(ACTION_ID_REMOTE_PREVIOUS, "Remote Previous", WearCompanionBridge.REMOTE_PREVIOUS)
 
-    fun remoteVolumeUp() = remoteCommand(WearCompanionBridge.REMOTE_VOLUME_UP)
+    fun remoteVolumeUp() = remoteCommand(ACTION_ID_REMOTE_VOLUME_UP, "Remote Volume +", WearCompanionBridge.REMOTE_VOLUME_UP)
 
-    fun remoteVolumeDown() = remoteCommand(WearCompanionBridge.REMOTE_VOLUME_DOWN)
+    fun remoteVolumeDown() = remoteCommand(ACTION_ID_REMOTE_VOLUME_DOWN, "Remote Volume -", WearCompanionBridge.REMOTE_VOLUME_DOWN)
 
     fun handoffQueueToWatch() {
         viewModelScope.launch {
-            val queue = mediaPlayerHandler.queueData.value?.data
-            val tracks =
-                when {
-                    queue?.listTracks?.isNotEmpty() == true -> queue.listTracks.take(MAX_HANDOFF_TRACKS)
-                    mediaPlayerHandler.nowPlayingState.value.track != null -> listOf(mediaPlayerHandler.nowPlayingState.value.track!!)
-                    else -> emptyList()
+            runTrackedAction(ACTION_ID_HANDOFF, "Queue handoff to watch") {
+                val queue = mediaPlayerHandler.queueData.value?.data
+                val tracks =
+                    when {
+                        queue?.listTracks?.isNotEmpty() == true -> queue.listTracks.take(MAX_HANDOFF_TRACKS)
+                        mediaPlayerHandler.nowPlayingState.value.track != null -> listOf(mediaPlayerHandler.nowPlayingState.value.track!!)
+                        else -> emptyList()
+                    }
+                if (tracks.isEmpty()) {
+                    ActionOutcome(
+                        success = false,
+                        detail = "Queue handoff skipped: queue is empty.",
+                        toast = "No queue to hand off.",
+                    )
+                } else {
+                    val index = mediaPlayerHandler.currentSongIndex.value.coerceIn(0, tracks.lastIndex)
+                    val payload =
+                        JSONObject()
+                            .put("command", WearCompanionBridge.REMOTE_HANDOFF_QUEUE)
+                            .put("tracks", Json.encodeToString(tracks))
+                            .put("index", index)
+                            .put("playlistId", queue?.playlistId ?: "")
+                            .put("playlistName", queue?.playlistName ?: "")
+                            .put("playlistType", queue?.playlistType?.name ?: "")
+
+                    val sent = sendSimpleAction(WearCompanionBridge.ACTION_REMOTE, payload)
+                    if (sent) {
+                        ActionOutcome(
+                            success = true,
+                            detail = "Queue handoff sent (${tracks.size} tracks).",
+                            toast = "Queue handoff sent to watch.",
+                        )
+                    } else {
+                        ActionOutcome(success = false, detail = "Watch is unreachable for queue handoff.")
+                    }
                 }
-            if (tracks.isEmpty()) {
-                makeToast("No queue to hand off.")
-                appendLog("Queue handoff skipped: queue is empty.")
-                return@launch
             }
+        }
+    }
 
-            val index = mediaPlayerHandler.currentSongIndex.value.coerceIn(0, tracks.lastIndex)
-            val payload =
-                JSONObject()
-                    .put("command", WearCompanionBridge.REMOTE_HANDOFF_QUEUE)
-                    .put("tracks", Json.encodeToString(tracks))
-                    .put("index", index)
-                    .put("playlistId", queue?.playlistId ?: "")
-                    .put("playlistName", queue?.playlistName ?: "")
-                    .put("playlistType", queue?.playlistType?.name ?: "")
-
-            val sent = sendSimpleAction(WearCompanionBridge.ACTION_REMOTE, payload)
-            if (sent) {
-                appendLog("Queue handoff sent (${tracks.size} tracks).")
-                makeToast("Queue handoff sent to watch.")
-            }
+    fun retryLastFailedAction() {
+        if (actionState.value.inProgress) return
+        when (lastFailedActionId) {
+            ACTION_ID_DIAGNOSTICS -> requestDiagnostics()
+            ACTION_ID_SESSION_SYNC -> syncSessionAndSpotify()
+            ACTION_ID_SELECTIVE_SYNC -> syncSelectedData()
+            ACTION_ID_REMOTE_PLAY_PAUSE -> remotePlayPause()
+            ACTION_ID_REMOTE_NEXT -> remoteNext()
+            ACTION_ID_REMOTE_PREVIOUS -> remotePrevious()
+            ACTION_ID_REMOTE_VOLUME_UP -> remoteVolumeUp()
+            ACTION_ID_REMOTE_VOLUME_DOWN -> remoteVolumeDown()
+            ACTION_ID_HANDOFF -> handoffQueueToWatch()
+            null -> makeToast("No failed action to retry.")
+            else -> makeToast("Retry is unavailable for the last action.")
         }
     }
 
@@ -271,13 +391,69 @@ class WatchCompanionViewModel(
         }
     }
 
-    private fun remoteCommand(command: String) {
+    private fun remoteCommand(
+        actionId: String,
+        label: String,
+        command: String,
+    ) {
         viewModelScope.launch {
-            val payload = JSONObject().put("command", command)
-            val sent = sendSimpleAction(WearCompanionBridge.ACTION_REMOTE, payload)
-            if (sent) {
-                appendLog("Remote command sent: $command")
+            runTrackedAction(actionId, label) {
+                val payload = JSONObject().put("command", command)
+                val sent = sendSimpleAction(WearCompanionBridge.ACTION_REMOTE, payload)
+                if (sent) {
+                    ActionOutcome(success = true, detail = "Remote command sent: $command")
+                } else {
+                    ActionOutcome(success = false, detail = "Watch is unreachable for remote command: $command.")
+                }
             }
+        }
+    }
+
+    private suspend fun runTrackedAction(
+        actionId: String,
+        label: String,
+        block: suspend () -> ActionOutcome,
+    ) {
+        _actionState.value =
+            _actionState.value.copy(
+                inProgress = true,
+                activeAction = label,
+                retryAvailable = false,
+            )
+
+        val outcome =
+            runCatching { block() }.getOrElse { error ->
+                ActionOutcome(
+                    success = false,
+                    detail = error.message ?: "Unexpected error.",
+                    toast = "Action failed unexpectedly.",
+                )
+            }
+
+        if (outcome.success) {
+            lastFailedActionId = null
+            _actionState.value =
+                _actionState.value.copy(
+                    inProgress = false,
+                    activeAction = "",
+                    lastSuccess = "${timestamp()} • ${outcome.detail}",
+                    lastFailure = "",
+                    retryAvailable = false,
+                )
+        } else {
+            lastFailedActionId = actionId
+            _actionState.value =
+                _actionState.value.copy(
+                    inProgress = false,
+                    activeAction = "",
+                    lastFailure = "${timestamp()} • ${outcome.detail}",
+                    retryAvailable = true,
+                )
+        }
+
+        appendLog("$label: ${if (outcome.success) "success" else "failure"} (${outcome.detail})")
+        if (outcome.toast.isNotBlank()) {
+            makeToast(outcome.toast)
         }
     }
 
@@ -308,6 +484,8 @@ class WatchCompanionViewModel(
                 .toByteArray(Charsets.UTF_8)
         return sendMessage(nodeId, body)
     }
+
+    private fun timestamp(): String = LocalTime.now().truncatedTo(ChronoUnit.SECONDS).toString()
 
     private fun songToJson(song: SongEntity): JSONObject =
         JSONObject()
@@ -433,6 +611,27 @@ class WatchCompanionViewModel(
                 _logText.value = it.orEmpty()
             }
         }
+        viewModelScope.launch {
+            dataStoreManager.getString(WearCompanionBridge.KEY_AUTO_SYNC_BATTERY_SAVER).collect {
+                _autoSyncPolicy.value =
+                    _autoSyncPolicy.value.copy(
+                        batterySaver = it.toBooleanFlag(),
+                    )
+            }
+        }
+        viewModelScope.launch {
+            dataStoreManager.getString(WearCompanionBridge.KEY_AUTO_SYNC_UNMETERED_ONLY).collect {
+                _autoSyncPolicy.value =
+                    _autoSyncPolicy.value.copy(
+                        unmeteredOnly = it.toBooleanFlag(),
+                    )
+            }
+        }
+        viewModelScope.launch {
+            dataStoreManager.getString(WearCompanionBridge.KEY_AUTO_SYNC_LAST_STATS).collect {
+                _autoSyncStatsSummary.value = formatAutoSyncStats(it)
+            }
+        }
     }
 
     private fun appendLog(message: String) {
@@ -475,8 +674,36 @@ class WatchCompanionViewModel(
         }
 
     companion object {
+        private const val ACTION_ID_DIAGNOSTICS = "diagnostics"
+        private const val ACTION_ID_SESSION_SYNC = "session_sync"
+        private const val ACTION_ID_SELECTIVE_SYNC = "selective_sync"
+        private const val ACTION_ID_REMOTE_PLAY_PAUSE = "remote_play_pause"
+        private const val ACTION_ID_REMOTE_NEXT = "remote_next"
+        private const val ACTION_ID_REMOTE_PREVIOUS = "remote_previous"
+        private const val ACTION_ID_REMOTE_VOLUME_UP = "remote_volume_up"
+        private const val ACTION_ID_REMOTE_VOLUME_DOWN = "remote_volume_down"
+        private const val ACTION_ID_HANDOFF = "handoff_queue"
         private const val MAX_SYNC_ITEMS = 120
         private const val MAX_HANDOFF_TRACKS = 80
         private const val MAX_LOG_CHARS = 16000
     }
 }
+
+private fun String?.toBooleanFlag(): Boolean = this == DataStoreManager.TRUE
+
+private fun formatAutoSyncStats(raw: String?): String {
+    if (raw.isNullOrBlank()) return "No auto-sync run yet."
+    val stats = runCatching { JSONObject(raw) }.getOrNull() ?: return "Auto-sync stats unavailable."
+    val status = stats.optString("status").ifBlank { "unknown" }
+    val attempted = stats.optInt("attempted", 0)
+    val sent = stats.optInt("sent", 0)
+    val changed = stats.optInt("changedCategories", 0)
+    val reason = stats.optString("reason").ifBlank { "n/a" }
+    return "Status: $status • Delivered $sent/$attempted • Changed categories: $changed • Reason: $reason"
+}
+
+private data class ActionOutcome(
+    val success: Boolean,
+    val detail: String,
+    val toast: String = "",
+)
