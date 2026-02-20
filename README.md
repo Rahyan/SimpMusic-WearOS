@@ -9,26 +9,32 @@ WearOS-focused fork of SimpMusic, with standalone watch playback and a Wear-nati
 
 ## Current Wear Status
 - Dedicated `wearApp` module.
-- Wear screens: Discover, Home, Library, Playlist (local + YouTube), Song Details, Now Playing, Queue, Accounts, Login.
+- Wear screens: Discover, Home, Library, Playlist (local + YouTube), Song Details, Now Playing, Queue, Accounts, Login, Downloads, Search filters, online playlists.
 - Phone-assisted login bridge is implemented for devices where watch-side WebView is unavailable/unreliable.
-- Playback pipeline has Wear-specific reliability hardening and resolver fallback tuning.
+- Playback pipeline has Wear-specific reliability hardening, resolver fallback tuning, and watch battery-aware stream selection.
 - Tested on: Galaxy Watch4 Classic, WearOS 5
 
 ## Recent Progress (Feb 2026)
-- Migrated this fork onto `upstream/main` lineage and consolidated the fork to a single default branch: `main`.
-- Added proper Wear-native rotary + visible list scroll UX using `rotaryScrollable` and `ScrollIndicator`.
-- Expanded Library parity with new Wear screens/routes:
-  - Liked songs
-  - Recently played
-  - Followed artists
-  - Liked albums
-  - Followed releases (artist singles/albums)
-- Replaced oversized quick actions with compact chip-style actions better suited to round Wear displays.
-- Revalidated repeatedly with:
-  - `:wearApp:lintDebug`
-  - `:wearApp:assembleDebug`
-  - `:wearApp:testDebugUnitTest`
-- Installed and verified on real watch hardware over wireless ADB.
+- Immersive player + drag sheet: Controls/Lyrics/Queue tabs, scrollable expanded sheet, queue reordering/removal, and centered karaoke-style synced lyrics.
+- Lyrics upgrades: translation modes (`Original` / `Translated` / `Both`), tap-to-seek lines, and offline lyrics pinning for downloaded tracks.
+- Search + library parity: category filters (songs/playlists/artists/podcasts), deeper liked/recent/followed flows, and improved library state retention.
+- Tile + complication support: dynamic playback tile, actionable controls (prev/play-next), playback-aware complication actions.
+- Phone companion upgrades: selective sync, diagnostics/log export, remote controls, bidirectional queue handoff (phone↔watch), and background auto-sync worker.
+- Performance + battery pass: wearable battery saver mode, phone offload controls with watch-only override, delta sync signatures/stats, and charging/Wi-Fi-aware auto-sync policies.
+
+## Wear Feature Highlights
+- **Immersive playback UX**: compact round-screen controls, marquee title, progress ring, queue/lyrics in the same sheet.
+- **Companion bridge**: watch can control phone playback, and handoff waits for explicit ack before success/pause behavior.
+- **Battery-aware operation**: reduced heavy visual work in battery saver, plus conservative watch stream probing and auto-sync policy gates.
+
+## Fresh Watch Screenshots
+| Discover | Playlists |
+| --- | --- |
+| ![Wear Discover](asset/readme/wear-discover.png) | ![Wear Playlists](asset/readme/wear-playlists.png) |
+
+| Downloads | Search |
+| --- | --- |
+| ![Wear Downloads](asset/readme/wear-downloads.png) | ![Wear Search](asset/readme/wear-search.png) |
 
 ## Architecture Notes
 - Reuses shared core/data/media/service modules from the original app where practical.
