@@ -12,6 +12,13 @@ KEYSTORE_PASSWORD="${KEYSTORE_PASSWORD}"
 KEY_ALIAS="${KEY_ALIAS}"
 KEY_PASSWORD="${KEY_PASSWORD}"
 
+# If key password is omitted, default to keystore password.
+# This matches common setups where both passwords are identical.
+if [ -z "$KEY_PASSWORD" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+  echo "KEY_PASSWORD is empty, defaulting to KEYSTORE_PASSWORD."
+  KEY_PASSWORD="$KEYSTORE_PASSWORD"
+fi
+
 # Check if KEY_PASSWORD is set
 if [ -z "$KEY_PASSWORD" ]; then
   echo "Error: KEY_PASSWORD environment variable must be set"

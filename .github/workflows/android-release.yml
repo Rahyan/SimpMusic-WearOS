@@ -53,7 +53,7 @@ jobs:
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || secrets.KEY_STORE_PASSWORD }}
         run: ./build_and_sign_apk.sh --full --release
 
       - name: Upload APK
@@ -90,7 +90,7 @@ jobs:
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || secrets.KEY_STORE_PASSWORD }}
         run: ./build_and_sign_apk.sh --foss --release
 
       - name: Upload APK
