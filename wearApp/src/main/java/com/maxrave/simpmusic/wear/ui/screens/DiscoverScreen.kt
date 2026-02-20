@@ -2,6 +2,7 @@ package com.maxrave.simpmusic.wear.ui.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +25,7 @@ import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.FilledTonalButton
+import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -130,6 +132,9 @@ fun DiscoverScreen(
                 Text(
                     text = if (loggedIn) "Discover" else "Discover (Guest)",
                     style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = openSearch) {
@@ -338,7 +343,7 @@ private fun MiniPlayerHeader(
             Modifier
                 .fillMaxWidth()
                 .background(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
                     shape = RoundedCornerShape(18.dp),
                 )
                 .padding(horizontal = 10.dp, vertical = 10.dp),
@@ -348,6 +353,7 @@ private fun MiniPlayerHeader(
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
             modifier = Modifier.clickable(onClick = onOpenNowPlaying),
         )
         if (artist.isNotBlank()) {
@@ -356,7 +362,7 @@ private fun MiniPlayerHeader(
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
             )
         }
 
@@ -383,6 +389,11 @@ private fun MiniPlayerHeader(
         FilledTonalButton(
             onClick = onOpenQueue,
             modifier = Modifier.fillMaxWidth(),
+            colors =
+                ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
         ) {
             Text("Open queue")
         }
@@ -401,13 +412,18 @@ private fun ContentRow(
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
                 .background(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
+                    shape = RoundedCornerShape(16.dp),
+                ).border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
                     shape = RoundedCornerShape(16.dp),
                 ).padding(horizontal = 10.dp, vertical = 10.dp),
     ) {
         Text(
             text = content.title,
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -415,7 +431,7 @@ private fun ContentRow(
             Text(
                 text = artist,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

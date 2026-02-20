@@ -209,6 +209,7 @@ fun WearAppRoot(mediaPlayerHandler: MediaPlayerHandler) {
                     mediaPlayerHandler = mediaPlayerHandler,
                     onBack = { navController.popBackStack() },
                     onOpenVolumeSettings = { navController.navigate(Routes.VOLUME) },
+                    onOpenQueue = { navController.navigate(Routes.QUEUE) },
                 )
             }
             composable(Routes.VOLUME) {

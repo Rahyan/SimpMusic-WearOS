@@ -1,6 +1,8 @@
 package com.maxrave.simpmusic.wear.ui.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -20,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -33,10 +37,17 @@ import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.repository.AccountRepository
 import com.maxrave.domain.repository.CommonRepository
 import com.maxrave.simpmusic.wear.auth.WearAccountManager
-import com.maxrave.simpmusic.wear.ui.theme.ACCENT_PRESET_DYNAMIC
+import com.maxrave.simpmusic.wear.ui.theme.ACCENT_PRESET_DEFAULT
 import com.maxrave.simpmusic.wear.ui.theme.KEY_WEAR_ACCENT_PRESET
+import com.maxrave.simpmusic.wear.ui.theme.KEY_WEAR_BATTERY_SAVER_MODE
+import com.maxrave.simpmusic.wear.ui.theme.KEY_WEAR_PHONE_OFFLOAD_CONTROLS
+import com.maxrave.simpmusic.wear.ui.theme.KEY_WEAR_PLAYER_STYLE
+import com.maxrave.simpmusic.wear.ui.theme.WEAR_PLAYER_STYLE_DEFAULT
 import com.maxrave.simpmusic.wear.ui.theme.accentPresetLabel
 import com.maxrave.simpmusic.wear.ui.theme.nextAccentPreset
+import com.maxrave.simpmusic.wear.ui.theme.nextWearPlayerStyle
+import com.maxrave.simpmusic.wear.ui.theme.wearPlayerStyleLabel
+import com.maxrave.simpmusic.wear.ui.components.WearEmptyState
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -124,8 +135,20 @@ fun AccountsScreen(
     val spotifyLinked = spotifySpdc.isNotBlank()
     val accentPreset =
         dataStoreManager.getString(KEY_WEAR_ACCENT_PRESET)
-            .collectAsStateWithLifecycle(initialValue = ACCENT_PRESET_DYNAMIC)
-            .value ?: ACCENT_PRESET_DYNAMIC
+            .collectAsStateWithLifecycle(initialValue = ACCENT_PRESET_DEFAULT)
+            .value ?: ACCENT_PRESET_DEFAULT
+    val playerStyle =
+        dataStoreManager.getString(KEY_WEAR_PLAYER_STYLE)
+            .collectAsStateWithLifecycle(initialValue = WEAR_PLAYER_STYLE_DEFAULT)
+            .value ?: WEAR_PLAYER_STYLE_DEFAULT
+    val wearBatterySaverEnabled =
+        dataStoreManager.getString(KEY_WEAR_BATTERY_SAVER_MODE)
+            .collectAsStateWithLifecycle(initialValue = DataStoreManager.FALSE)
+            .value == DataStoreManager.TRUE
+    val phoneOffloadEnabled =
+        dataStoreManager.getString(KEY_WEAR_PHONE_OFFLOAD_CONTROLS)
+            .collectAsStateWithLifecycle(initialValue = DataStoreManager.FALSE)
+            .value == DataStoreManager.TRUE
 
     fun requestPhoneSync() {
         val appCtx = context.applicationContext
@@ -191,20 +214,25 @@ fun AccountsScreen(
                     Modifier
                         .fillMaxWidth()
                         .clickable(onClick = { requestPhoneSync() })
-                        .padding(vertical = 8.dp),
+                        .settingCardModifier(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(Icons.Filled.Sync, contentDescription = "Sync phone session")
+                Icon(
+                    Icons.Filled.Sync,
+                    contentDescription = "Sync phone session",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Sync session from phone",
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                     Text(
                         text = "Request current phone login cookie",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -237,16 +265,51 @@ fun AccountsScreen(
                                         Toast.LENGTH_SHORT,
                                     ).show()
                             }
-                        }.padding(vertical = 8.dp),
+                        }.settingCardModifier(),
             ) {
                 Text(
                     text = "Material You accent",
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
                 Text(
                     text = "${accentPresetLabel(accentPreset)} • tap to cycle",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
+        item {
+            Spacer(Modifier.height(6.dp))
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            val next = nextWearPlayerStyle(playerStyle)
+                            scope.launch {
+                                dataStoreManager.putString(KEY_WEAR_PLAYER_STYLE, next)
+                                Toast
+                                    .makeText(
+                                        context,
+                                        "Player: ${wearPlayerStyleLabel(next)}",
+                                        Toast.LENGTH_SHORT,
+                                    ).show()
+                            }
+                        }.settingCardModifier(),
+            ) {
+                Text(
+                    text = "Now playing layout",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+                Text(
+                    text = "${wearPlayerStyleLabel(playerStyle)} • tap to switch",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -264,14 +327,9 @@ fun AccountsScreen(
 
         if (accounts.isEmpty()) {
             item {
-                Text(
-                    text = "No accounts yet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    text = "Tap Add account to sign in.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                WearEmptyState(
+                    title = "No accounts yet.",
+                    hint = "Tap Add account to sign in.",
                 )
             }
         } else {
@@ -291,18 +349,19 @@ fun AccountsScreen(
                                     Toast.makeText(context, "Switched account", Toast.LENGTH_SHORT).show()
                                 }
                             }
-                            .padding(vertical = 8.dp),
+                            .settingCardModifier(),
                 ) {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         text = acc.email,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -317,14 +376,19 @@ fun AccountsScreen(
                     Modifier
                         .fillMaxWidth()
                         .clickable(onClick = openLogin)
-                        .padding(vertical = 10.dp),
+                        .settingCardModifier(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "Add account")
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = "Add account",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
                 Text(
                     text = "Add account",
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
         }
@@ -335,6 +399,38 @@ fun AccountsScreen(
                 text = "Playback & stream",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
+            )
+        }
+
+        item {
+            SettingToggleRow(
+                title = "Wear battery saver",
+                subtitle = "Reduce visuals and lyric update work to save battery.",
+                enabled = wearBatterySaverEnabled,
+                onToggle = {
+                    scope.launch {
+                        dataStoreManager.putString(
+                            KEY_WEAR_BATTERY_SAVER_MODE,
+                            if (wearBatterySaverEnabled) DataStoreManager.FALSE else DataStoreManager.TRUE,
+                        )
+                    }
+                },
+            )
+        }
+
+        item {
+            SettingToggleRow(
+                title = "Auto offload to phone",
+                subtitle = "Route play/next/previous to phone when connected (override in player).",
+                enabled = phoneOffloadEnabled,
+                onToggle = {
+                    scope.launch {
+                        dataStoreManager.putString(
+                            KEY_WEAR_PHONE_OFFLOAD_CONTROLS,
+                            if (phoneOffloadEnabled) DataStoreManager.FALSE else DataStoreManager.TRUE,
+                        )
+                    }
+                },
             )
         }
 
@@ -583,6 +679,14 @@ private fun SettingToggleRow(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .background(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
+                    shape = RoundedCornerShape(16.dp),
+                ).border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
+                    shape = RoundedCornerShape(16.dp),
+                )
                 .clickable(
                     onClick = {
                         if (isInteractive) {
@@ -592,7 +696,7 @@ private fun SettingToggleRow(
                         }
                     },
                 )
-                .padding(vertical = 8.dp),
+                .padding(horizontal = 10.dp, vertical = 10.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -602,7 +706,12 @@ private fun SettingToggleRow(
             Text(
                 text = title,
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isInteractive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                color =
+                    if (isInteractive) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    },
             )
             Text(
                 text =
@@ -612,15 +721,33 @@ private fun SettingToggleRow(
                         "Unavailable"
                     },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color =
+                    if (isInteractive && enabled) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+                    },
             )
         }
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
     }
 }
+
+private fun Modifier.settingCardModifier(): Modifier =
+    composed {
+        this
+            .background(
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
+                shape = RoundedCornerShape(16.dp),
+            ).border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
+                shape = RoundedCornerShape(16.dp),
+            ).padding(horizontal = 10.dp, vertical = 10.dp)
+    }

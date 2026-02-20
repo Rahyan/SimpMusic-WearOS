@@ -6,6 +6,7 @@ import com.maxrave.common.MERGING_DATA_TYPE
 import com.maxrave.common.QUALITY
 import com.maxrave.common.StreamHealthRegistry
 import com.maxrave.common.VIDEO_QUALITY
+import com.maxrave.common.WearCompanionBridge
 import com.maxrave.data.db.LocalDataSource
 import com.maxrave.data.mapping.toSponsorSkipSegments
 import com.maxrave.data.mapping.toTrack
@@ -160,6 +161,10 @@ internal class StreamRepositoryImpl(
                 val normalizedMediaId = videoId.removePrefix(MERGING_DATA_TYPE.VIDEO)
                 val videoFormats = formatList.filter { !it.isAudio && it.url.isNullOrEmpty().not() }
                 val audioFormats = formatList.filter { it.isAudio && it.url.isNullOrEmpty().not() }
+                val wearBatterySaverProfile =
+                    isWatchDevice &&
+                        dataStoreManager.getString(WearCompanionBridge.KEY_WEAR_BATTERY_SAVER_MODE).first() ==
+                        DataStoreManager.TRUE
                 val preferredAudioFormat =
                     if (isWatchDevice) {
                         // On watch, prefer lower-bitrate Opus first; AAC(140) is kept as fallback.
@@ -219,11 +224,17 @@ internal class StreamRepositoryImpl(
                                 watchPriorityItags.mapNotNull { targetItag ->
                                     audioFormats.firstOrNull { it.itag == targetItag }
                                 }
-                            listOfNotNull(
-                                preferredAudioFormat,
-                                firstAdaptiveAudio,
-                                superFormat,
-                            ) + byWatchPriority + byBitrate
+                            if (wearBatterySaverProfile) {
+                                listOfNotNull(
+                                    preferredAudioFormat,
+                                ) + byWatchPriority + byBitrate.take(3)
+                            } else {
+                                listOfNotNull(
+                                    preferredAudioFormat,
+                                    firstAdaptiveAudio,
+                                    superFormat,
+                                ) + byWatchPriority + byBitrate
+                            }
                         } else {
                             listOfNotNull(
                                 preferredAudioFormat,
@@ -233,8 +244,18 @@ internal class StreamRepositoryImpl(
                             ) + audioFormats
                         }
                     val rankedCandidates = rankByHealth(orderedCandidates)
-                    val maxChecks = if (isWatchDevice) 8 else 6
-                    val checkTimeoutMs = if (isWatchDevice) 3_000L else 4_000L
+                    val maxChecks =
+                        when {
+                            isWatchDevice && wearBatterySaverProfile -> 4
+                            isWatchDevice -> 8
+                            else -> 6
+                        }
+                    val checkTimeoutMs =
+                        when {
+                            isWatchDevice && wearBatterySaverProfile -> 2_000L
+                            isWatchDevice -> 3_000L
+                            else -> 4_000L
+                        }
                     var fallbackUnchecked: PlayerResponse.StreamingData.Format? = null
                     var fallbackAny: PlayerResponse.StreamingData.Format? = null
 

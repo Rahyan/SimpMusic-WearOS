@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.CircularProgressIndicator
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
@@ -134,6 +135,16 @@ fun SongDetailsScreen(
     val queueIndex = queueTracks.indexOfFirst { it.videoId == track.videoId }
     val canRemoveFromQueue = queueIndex >= 0
     val primaryArtistId = track.artists?.firstOrNull { !it.id.isNullOrBlank() }?.id
+    val tonalButtonColors =
+        ButtonDefaults.filledTonalButtonColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    val primaryButtonColors =
+        ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        )
 
     WearList {
         item {
@@ -163,14 +174,14 @@ fun SongDetailsScreen(
                         .fillMaxWidth()
                         .height(92.dp)
                         .clip(MaterialTheme.shapes.large)
-                        .background(MaterialTheme.colorScheme.surfaceContainerLow),
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (artworkUrl.isNullOrBlank()) {
                     Icon(
                         imageVector = Icons.Filled.MusicNote,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
                         modifier = Modifier.padding(top = 30.dp),
                     )
                 } else {
@@ -214,6 +225,7 @@ fun SongDetailsScreen(
                 FilledTonalButton(
                     onClick = { onOpenArtist(artistId) },
                     modifier = Modifier.fillMaxWidth(),
+                    colors = tonalButtonColors,
                 ) {
                     Text("Open artist")
                 }
@@ -243,6 +255,7 @@ fun SongDetailsScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isResolving || showRetryHint,
+                colors = primaryButtonColors,
             ) {
                 if (isResolving) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp))
@@ -275,6 +288,7 @@ fun SongDetailsScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
+                colors = tonalButtonColors,
             ) {
                 Text("Play next")
             }
@@ -289,6 +303,7 @@ fun SongDetailsScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
+                colors = tonalButtonColors,
             ) {
                 Text("Add to queue")
             }
@@ -304,6 +319,7 @@ fun SongDetailsScreen(
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    colors = tonalButtonColors,
                 ) {
                     Text("Remove from queue")
                 }
@@ -326,6 +342,7 @@ fun SongDetailsScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = canTriggerDownload || canRemoveDownload,
+                colors = tonalButtonColors,
             ) {
                 Text(downloadLabel)
             }
@@ -336,6 +353,7 @@ fun SongDetailsScreen(
                 onClick = onOpenNowPlaying,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = nowPlayingState.isNotEmpty(),
+                colors = tonalButtonColors,
             ) {
                 Text("Open player")
             }

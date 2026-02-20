@@ -10,14 +10,15 @@ const val ACCENT_PRESET_FOREST = "forest"
 const val ACCENT_PRESET_SUNSET = "sunset"
 const val ACCENT_PRESET_ORCHID = "orchid"
 const val ACCENT_PRESET_MONO = "mono"
+const val ACCENT_PRESET_DEFAULT = ACCENT_PRESET_OCEAN
+const val KEY_WEAR_ACCENT_MIGRATED = "wear_accent_migrated"
+const val WEAR_ACCENT_MIGRATION_DONE = "done"
 
 private val ACCENT_PRESET_ORDER =
     listOf(
-        ACCENT_PRESET_DYNAMIC,
         ACCENT_PRESET_OCEAN,
         ACCENT_PRESET_FOREST,
         ACCENT_PRESET_SUNSET,
-        ACCENT_PRESET_ORCHID,
         ACCENT_PRESET_MONO,
     )
 
@@ -43,12 +44,26 @@ fun ColorScheme.withAccentPreset(preset: String): ColorScheme =
                 primary = Color(0xFF5EA2FF),
                 primaryDim = Color(0xFF9EC8FF),
                 primaryContainer = Color(0xFF1A4C88),
+                onPrimary = Color(0xFFEAF3FF),
+                onPrimaryContainer = Color(0xFFE3EEFF),
                 secondary = Color(0xFF6DB5FF),
                 secondaryDim = Color(0xFF9ACDFF),
                 secondaryContainer = Color(0xFF1F4E76),
+                onSecondary = Color(0xFFEAF4FF),
+                onSecondaryContainer = Color(0xFFDFEEFF),
                 tertiary = Color(0xFF7BC8FF),
                 tertiaryDim = Color(0xFFAEE0FF),
                 tertiaryContainer = Color(0xFF265178),
+                onTertiary = Color(0xFFE8F6FF),
+                onTertiaryContainer = Color(0xFFE1F1FF),
+                background = Color(0xFF0F1724),
+                onBackground = Color(0xFFE1EDFA),
+                onSurface = Color(0xFFE1EDFA),
+                onSurfaceVariant = Color(0xFFB5C7DE),
+                outline = Color(0xFF4A6482),
+                surfaceContainerLow = Color(0xFF152336),
+                surfaceContainer = Color(0xFF1A2A40),
+                surfaceContainerHigh = Color(0xFF20324B),
             )
         ACCENT_PRESET_FOREST ->
             copy(

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -23,10 +24,14 @@ import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.FilledTonalButton
+import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.MaterialTheme
@@ -52,7 +58,17 @@ import com.maxrave.simpmusic.wear.ui.components.QuickActionChip
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import com.maxrave.simpmusic.wear.ui.components.WearLoadingState
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.collect
 import org.koin.core.context.GlobalContext
+
+private object WearLibraryScreenCache {
+    var playlists: List<LocalPlaylistEntity> = emptyList()
+    var downloadedTracks: List<com.maxrave.domain.data.model.browse.album.Track> = emptyList()
+    var hasResolvedPlaylists: Boolean = false
+    var hasResolvedDownloads: Boolean = false
+    var scrollIndex: Int = 0
+    var scrollOffset: Int = 0
+}
 
 @Composable
 fun LibraryScreen(
@@ -76,10 +92,43 @@ fun LibraryScreen(
     val scope = rememberCoroutineScope()
     val repo: LocalPlaylistRepository = remember { GlobalContext.get().get() }
     val songRepository: SongRepository = remember { GlobalContext.get().get() }
-    val playlists by repo.getAllLocalPlaylists().collectAsStateWithLifecycle(initialValue = null)
-    val downloadedSongs by songRepository.getDownloadedSongs().collectAsStateWithLifecycle(initialValue = null)
-    val listState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() }
-    val downloadedTracks = remember(downloadedSongs) { downloadedSongs.orEmpty().map { it.toTrack() } }
+    val playlists by remember(repo) { repo.getAllLocalPlaylists() }.collectAsStateWithLifecycle(initialValue = null)
+    val downloadedSongs by remember(songRepository) { songRepository.getDownloadedSongs() }.collectAsStateWithLifecycle(initialValue = null)
+    val listState =
+        rememberSaveable(saver = LazyListState.Saver) {
+            LazyListState(
+                firstVisibleItemIndex = WearLibraryScreenCache.scrollIndex,
+                firstVisibleItemScrollOffset = WearLibraryScreenCache.scrollOffset,
+            )
+        }
+    var cachedPlaylists by remember { mutableStateOf(WearLibraryScreenCache.playlists) }
+    var cachedDownloadedTracks by remember { mutableStateOf(WearLibraryScreenCache.downloadedTracks) }
+
+    LaunchedEffect(playlists) {
+        playlists?.let {
+            cachedPlaylists = it
+            WearLibraryScreenCache.playlists = it
+            WearLibraryScreenCache.hasResolvedPlaylists = true
+        }
+    }
+    LaunchedEffect(downloadedSongs) {
+        downloadedSongs?.let { songs ->
+            val mapped = songs.map { it.toTrack() }
+            cachedDownloadedTracks = mapped
+            WearLibraryScreenCache.downloadedTracks = mapped
+            WearLibraryScreenCache.hasResolvedDownloads = true
+        }
+    }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                WearLibraryScreenCache.scrollIndex = index
+                WearLibraryScreenCache.scrollOffset = offset
+            }
+    }
+
+    val displayPlaylists = playlists ?: cachedPlaylists
+    val downloadedTracks = downloadedSongs?.map { it.toTrack() } ?: cachedDownloadedTracks
 
     WearList(state = listState) {
         item {
@@ -106,6 +155,11 @@ fun LibraryScreen(
             FilledTonalButton(
                 onClick = openDownloads,
                 modifier = Modifier.fillMaxWidth(),
+                colors =
+                    ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
             ) {
                 Text("Downloads (${downloadedTracks.size})")
             }
@@ -235,6 +289,11 @@ fun LibraryScreen(
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = downloadedTracks.isNotEmpty(),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
             ) {
                 Text("Play downloaded")
             }
@@ -246,18 +305,23 @@ fun LibraryScreen(
             Text(
                 text = "Local playlists",
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.primary,
             )
         }
 
-        if (playlists == null) {
+        val hasLibrarySnapshot =
+            WearLibraryScreenCache.hasResolvedPlaylists ||
+                WearLibraryScreenCache.hasResolvedDownloads ||
+                cachedPlaylists.isNotEmpty() ||
+                cachedDownloadedTracks.isNotEmpty()
+        if (!hasLibrarySnapshot && playlists == null && downloadedSongs == null) {
             item {
                 WearLoadingState("Loading library...")
             }
             return@WearList
         }
 
-        if (playlists.orEmpty().isEmpty()) {
+        if (displayPlaylists.isEmpty()) {
             item {
                 WearEmptyState(
                     title = "No local playlists yet.",
@@ -267,8 +331,8 @@ fun LibraryScreen(
             return@WearList
         }
 
-        items(playlists.orEmpty().size) { index ->
-            val pl = playlists.orEmpty()[index]
+        items(displayPlaylists.size) { index ->
+            val pl = displayPlaylists[index]
             PlaylistRow(playlist = pl, onClick = { openPlaylist(pl.id) })
         }
     }
@@ -286,20 +350,25 @@ private fun PlaylistRow(
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
                 .background(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
+                    shape = RoundedCornerShape(16.dp),
+                ).border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
                     shape = RoundedCornerShape(16.dp),
                 ).padding(horizontal = 10.dp, vertical = 10.dp),
     ) {
         Text(
             text = playlist.title,
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = "$count tracks",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

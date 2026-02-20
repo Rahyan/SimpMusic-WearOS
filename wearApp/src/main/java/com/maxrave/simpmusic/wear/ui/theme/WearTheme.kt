@@ -1,6 +1,7 @@
 package com.maxrave.simpmusic.wear.ui.theme
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -20,9 +21,35 @@ fun WearTheme(content: @Composable () -> Unit) {
     val accentPreset by
         dataStoreManager
             .getString(KEY_WEAR_ACCENT_PRESET)
-            .collectAsState(initial = ACCENT_PRESET_DYNAMIC)
+            .collectAsState(initial = ACCENT_PRESET_DEFAULT)
+    val accentMigrated by
+        dataStoreManager
+            .getString(KEY_WEAR_ACCENT_MIGRATED)
+            .collectAsState(initial = null)
+    val supportedPresetValues =
+        remember {
+            setOf(
+                ACCENT_PRESET_OCEAN,
+                ACCENT_PRESET_FOREST,
+                ACCENT_PRESET_SUNSET,
+                ACCENT_PRESET_MONO,
+            )
+        }
+    val normalizedPreset =
+        when {
+            accentPreset.isNullOrBlank() -> ACCENT_PRESET_DEFAULT
+            accentPreset in supportedPresetValues -> accentPreset!!
+            else -> ACCENT_PRESET_DEFAULT
+        }
+    LaunchedEffect(accentPreset, accentMigrated) {
+        if (accentPreset != normalizedPreset) {
+            dataStoreManager.putString(KEY_WEAR_ACCENT_PRESET, normalizedPreset)
+        }
+        if (accentMigrated == WEAR_ACCENT_MIGRATION_DONE) return@LaunchedEffect
+        dataStoreManager.putString(KEY_WEAR_ACCENT_MIGRATED, WEAR_ACCENT_MIGRATION_DONE)
+    }
     val baseScheme = dynamicColorScheme(context) ?: ColorScheme()
-    val scheme = remember(baseScheme, accentPreset) { baseScheme.withAccentPreset(accentPreset ?: ACCENT_PRESET_DYNAMIC) }
+    val scheme = remember(baseScheme, normalizedPreset) { baseScheme.withAccentPreset(normalizedPreset) }
     MaterialTheme(
         colorScheme = scheme,
         typography = Typography(),

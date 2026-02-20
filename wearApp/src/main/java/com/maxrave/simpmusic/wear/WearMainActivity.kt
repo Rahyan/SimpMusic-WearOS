@@ -12,6 +12,8 @@ import androidx.lifecycle.lifecycleScope
 import com.maxrave.common.Config
 import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
+import com.maxrave.domain.mediaservice.handler.PlayerEvent
+import com.maxrave.simpmusic.wear.tile.SimpMusicTileService
 import com.maxrave.simpmusic.wear.ui.WearAppRoot
 import com.maxrave.simpmusic.wear.ui.theme.WearTheme
 import kotlinx.coroutines.launch
@@ -24,6 +26,7 @@ class WearMainActivity : ComponentActivity() {
         get() = intent?.getStringExtra(EXTRA_DEBUG_VIDEO_ID)
 
     private var didDebugAutoplay = false
+    private var pendingTileAction: String? = null
 
     private var shouldUnbind = false
     private val serviceConnection =
@@ -35,6 +38,7 @@ class WearMainActivity : ComponentActivity() {
                 mediaPlayerHandler.setActivitySession(this@WearMainActivity, WearMainActivity::class.java, service)
                 Log.w("WearMainActivity", "onServiceConnected")
                 maybeDebugAutoplay()
+                dispatchPendingTileAction()
             }
 
             override fun onServiceDisconnected(name: ComponentName?) {
@@ -44,6 +48,7 @@ class WearMainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        consumeTileActionFromIntent(intent)
         setContent {
             WearTheme {
                 WearAppRoot(mediaPlayerHandler = mediaPlayerHandler)
@@ -94,6 +99,7 @@ class WearMainActivity : ComponentActivity() {
         mediaPlayerHandler.startMediaService(this, serviceConnection)
         shouldUnbind = true
         maybeDebugAutoplay()
+        dispatchPendingTileAction()
     }
 
     override fun onStop() {
@@ -113,9 +119,31 @@ class WearMainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        consumeTileActionFromIntent(intent)
         // Allow repeated ADB launches with different extras to trigger again.
         didDebugAutoplay = false
         maybeDebugAutoplay()
+        dispatchPendingTileAction()
+    }
+
+    private fun consumeTileActionFromIntent(sourceIntent: Intent?) {
+        val action = sourceIntent?.getStringExtra(SimpMusicTileService.EXTRA_TILE_ACTION).orEmpty()
+        if (action.isBlank()) return
+        pendingTileAction = action
+        sourceIntent?.removeExtra(SimpMusicTileService.EXTRA_TILE_ACTION)
+    }
+
+    private fun dispatchPendingTileAction() {
+        val tileAction = pendingTileAction ?: return
+        pendingTileAction = null
+        lifecycleScope.launch {
+            when (tileAction) {
+                SimpMusicTileService.ACTION_PLAY_PAUSE -> mediaPlayerHandler.onPlayerEvent(PlayerEvent.PlayPause)
+                SimpMusicTileService.ACTION_NEXT -> mediaPlayerHandler.onPlayerEvent(PlayerEvent.Next)
+                SimpMusicTileService.ACTION_PREVIOUS -> mediaPlayerHandler.onPlayerEvent(PlayerEvent.Previous)
+                else -> Unit
+            }
+        }
     }
 
     private companion object {

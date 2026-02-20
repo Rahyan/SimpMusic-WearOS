@@ -89,6 +89,10 @@ dependencies {
     implementation(libs.wear.compose.material3)
     implementation(libs.wear.compose.navigation)
     implementation(libs.wear.input)
+    implementation(libs.wear.tiles)
+    implementation(libs.wear.protolayout)
+    implementation(libs.wear.watchface.complications.data.source.ktx)
+    implementation(libs.guava)
     // core/common has XML resources referencing Material theme attrs (e.g. ?attr/colorOnPrimary).
     implementation(libs.material)
     // Wear Data Layer (phone-assisted login, etc.)

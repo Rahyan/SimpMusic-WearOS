@@ -4,6 +4,8 @@ import android.app.Activity
 import android.app.RemoteInput
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.QueueMusic
@@ -28,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material3.FilledTonalButton
+import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.MaterialTheme
@@ -65,6 +69,7 @@ fun SearchScreen(
     val context = LocalContext.current
     val searchRepository: SearchRepository = remember { GlobalContext.get().get() }
     var query by rememberSaveable { mutableStateOf("") }
+    var selectedFilter by rememberSaveable { mutableStateOf(WearSearchFilter.ALL) }
     var selectedTrack by remember { mutableStateOf<Track?>(null) }
     val listState = rememberSaveable(query, saver = LazyListState.Saver) { LazyListState() }
 
@@ -74,6 +79,7 @@ fun SearchScreen(
     var artistResults by remember(query) { mutableStateOf<List<ArtistsResult>>(emptyList()) }
     var playlistResults by remember(query) { mutableStateOf<List<PlaylistsResult>>(emptyList()) }
     var featuredPlaylists by remember(query) { mutableStateOf<List<PlaylistsResult>>(emptyList()) }
+    var podcastResults by remember(query) { mutableStateOf<List<PlaylistsResult>>(emptyList()) }
     var searchLoading by remember(query) { mutableStateOf(false) }
     var searchError by remember(query) { mutableStateOf<String?>(null) }
 
@@ -102,12 +108,14 @@ fun SearchScreen(
 
     LaunchedEffect(query) {
         if (query.isBlank()) {
+            selectedFilter = WearSearchFilter.ALL
             songTracks = emptyList()
             videoTracks = emptyList()
             albumResults = emptyList()
             artistResults = emptyList()
             playlistResults = emptyList()
             featuredPlaylists = emptyList()
+            podcastResults = emptyList()
             searchLoading = false
             searchError = null
             return@LaunchedEffect
@@ -121,6 +129,7 @@ fun SearchScreen(
         artistResults = emptyList()
         playlistResults = emptyList()
         featuredPlaylists = emptyList()
+        podcastResults = emptyList()
 
         var lastError: String? = null
 
@@ -186,6 +195,18 @@ fun SearchScreen(
             }
         }
 
+        searchRepository.getSearchDataPodcast(query).collect { values ->
+            when (values) {
+                is Resource.Success ->
+                    podcastResults =
+                        values.data
+                            .orEmpty()
+                            .filter { it.browseId.isNotBlank() }
+                            .distinctBy { it.browseId }
+                is Resource.Error -> if (lastError.isNullOrBlank()) lastError = values.message
+            }
+        }
+
         searchLoading = false
 
         val hasAnyResults =
@@ -194,7 +215,8 @@ fun SearchScreen(
                 albumResults.isNotEmpty() ||
                 artistResults.isNotEmpty() ||
                 playlistResults.isNotEmpty() ||
-                featuredPlaylists.isNotEmpty()
+                featuredPlaylists.isNotEmpty() ||
+                podcastResults.isNotEmpty()
 
         if (!hasAnyResults && !lastError.isNullOrBlank()) {
             searchError = lastError
@@ -248,6 +270,11 @@ fun SearchScreen(
             FilledTonalButton(
                 onClick = { openWearKeyboard() },
                 modifier = Modifier.fillMaxWidth(),
+                colors =
+                    ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
             ) {
                 Text("Search on watch")
             }
@@ -257,6 +284,11 @@ fun SearchScreen(
             FilledTonalButton(
                 onClick = openPlaylistDirectory,
                 modifier = Modifier.fillMaxWidth(),
+                colors =
+                    ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
             ) {
                 Icon(Icons.Filled.QueueMusic, contentDescription = null)
                 Spacer(Modifier.padding(horizontal = 4.dp))
@@ -268,7 +300,7 @@ fun SearchScreen(
             item {
                 WearEmptyState(
                     title = "No search yet.",
-                    hint = "Search songs, albums, artists, and playlists from watch.",
+                    hint = "Search songs, playlists, artists, and podcasts from watch.",
                 )
             }
             return@WearList
@@ -282,17 +314,73 @@ fun SearchScreen(
             )
         }
 
+        item {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+                ) {
+                    WearSearchFilterChip(
+                        label = "All",
+                        selected = selectedFilter == WearSearchFilter.ALL,
+                        onClick = { selectedFilter = WearSearchFilter.ALL },
+                        modifier = Modifier.weight(1f),
+                    )
+                    WearSearchFilterChip(
+                        label = "Songs",
+                        selected = selectedFilter == WearSearchFilter.SONGS,
+                        onClick = { selectedFilter = WearSearchFilter.SONGS },
+                        modifier = Modifier.weight(1f),
+                    )
+                    WearSearchFilterChip(
+                        label = "Playlists",
+                        selected = selectedFilter == WearSearchFilter.PLAYLISTS,
+                        onClick = { selectedFilter = WearSearchFilter.PLAYLISTS },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+                ) {
+                    WearSearchFilterChip(
+                        label = "Artists",
+                        selected = selectedFilter == WearSearchFilter.ARTISTS,
+                        onClick = { selectedFilter = WearSearchFilter.ARTISTS },
+                        modifier = Modifier.weight(1f),
+                    )
+                    WearSearchFilterChip(
+                        label = "Podcasts",
+                        selected = selectedFilter == WearSearchFilter.PODCASTS,
+                        onClick = { selectedFilter = WearSearchFilter.PODCASTS },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+
         if (searchLoading) {
             item { WearLoadingState("Searching all categories...") }
             return@WearList
         }
 
         val noResults =
-            songTracks.isEmpty() &&
-                videoTracks.isEmpty() &&
-                albumResults.isEmpty() &&
-                artistResults.isEmpty() &&
-                allPlaylists.isEmpty()
+            when (selectedFilter) {
+                WearSearchFilter.ALL ->
+                    songTracks.isEmpty() &&
+                        videoTracks.isEmpty() &&
+                        albumResults.isEmpty() &&
+                        artistResults.isEmpty() &&
+                        allPlaylists.isEmpty() &&
+                        podcastResults.isEmpty()
+                WearSearchFilter.SONGS -> songTracks.isEmpty() && videoTracks.isEmpty()
+                WearSearchFilter.PLAYLISTS -> allPlaylists.isEmpty()
+                WearSearchFilter.ARTISTS -> artistResults.isEmpty()
+                WearSearchFilter.PODCASTS -> podcastResults.isEmpty()
+            }
 
         if (noResults) {
             item {
@@ -313,7 +401,7 @@ fun SearchScreen(
             return@WearList
         }
 
-        if (songTracks.isNotEmpty()) {
+        if ((selectedFilter == WearSearchFilter.ALL || selectedFilter == WearSearchFilter.SONGS) && songTracks.isNotEmpty()) {
             item { SectionHeader("Songs", songTracks.size) }
             items(songTracks.take(8).size) { index ->
                 val track = songTracks[index]
@@ -325,7 +413,7 @@ fun SearchScreen(
             }
         }
 
-        if (videoTracks.isNotEmpty()) {
+        if ((selectedFilter == WearSearchFilter.ALL || selectedFilter == WearSearchFilter.SONGS) && videoTracks.isNotEmpty()) {
             item { SectionHeader("Videos", videoTracks.size) }
             items(videoTracks.take(6).size) { index ->
                 val track = videoTracks[index]
@@ -337,7 +425,7 @@ fun SearchScreen(
             }
         }
 
-        if (albumResults.isNotEmpty()) {
+        if (selectedFilter == WearSearchFilter.ALL && albumResults.isNotEmpty()) {
             item { SectionHeader("Albums", albumResults.size) }
             items(albumResults.take(8).size) { index ->
                 val album = albumResults[index]
@@ -349,7 +437,7 @@ fun SearchScreen(
             }
         }
 
-        if (artistResults.isNotEmpty()) {
+        if ((selectedFilter == WearSearchFilter.ALL || selectedFilter == WearSearchFilter.ARTISTS) && artistResults.isNotEmpty()) {
             item { SectionHeader("Artists", artistResults.size) }
             items(artistResults.take(8).size) { index ->
                 val artist = artistResults[index]
@@ -361,7 +449,7 @@ fun SearchScreen(
             }
         }
 
-        if (allPlaylists.isNotEmpty()) {
+        if ((selectedFilter == WearSearchFilter.ALL || selectedFilter == WearSearchFilter.PLAYLISTS) && allPlaylists.isNotEmpty()) {
             item { SectionHeader("Playlists", allPlaylists.size) }
             items(allPlaylists.take(10).size) { index ->
                 val playlist = allPlaylists[index]
@@ -372,6 +460,72 @@ fun SearchScreen(
                 )
             }
         }
+
+        if ((selectedFilter == WearSearchFilter.ALL || selectedFilter == WearSearchFilter.PODCASTS) && podcastResults.isNotEmpty()) {
+            item { SectionHeader("Podcasts", podcastResults.size) }
+            items(podcastResults.take(10).size) { index ->
+                val podcast = podcastResults[index]
+                TrackRow(
+                    title = podcast.title,
+                    subtitle = listOf(podcast.author, podcast.itemCount).filter { it.isNotBlank() }.joinToString(" • "),
+                    onClick = { openPlaylist(podcast.browseId) },
+                )
+            }
+        }
+    }
+}
+
+private enum class WearSearchFilter {
+    ALL,
+    SONGS,
+    PLAYLISTS,
+    ARTISTS,
+    PODCASTS,
+}
+
+@Composable
+private fun WearSearchFilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier =
+            modifier
+                .background(
+                    color =
+                        if (selected) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.48f)
+                        },
+                    shape = RoundedCornerShape(999.dp),
+                ).border(
+                    width = 1.dp,
+                    color =
+                        if (selected) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+                        } else {
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.38f)
+                        },
+                    shape = RoundedCornerShape(999.dp),
+                ).clickable(onClick = onClick)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color =
+                if (selected) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -398,11 +552,19 @@ private fun TrackRow(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(vertical = 8.dp),
+                .background(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
+                    shape = RoundedCornerShape(16.dp),
+                ).border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
+                    shape = RoundedCornerShape(16.dp),
+                ).padding(horizontal = 10.dp, vertical = 10.dp),
     ) {
         Text(
             text = title,
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -410,7 +572,7 @@ private fun TrackRow(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

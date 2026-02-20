@@ -2,6 +2,8 @@ package com.maxrave.simpmusic.wear.ui.screens
 
 import android.app.Activity
 import android.app.RemoteInput
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
@@ -19,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.material3.FilledTonalButton
+import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.MaterialTheme
@@ -46,6 +51,15 @@ import org.koin.core.context.GlobalContext
 
 private const val PLAYLIST_SEARCH_REMOTE_INPUT_KEY = "wear_playlist_search_query"
 
+private object WearOnlinePlaylistsCache {
+    var libraryPlaylists: List<PlaylistsResult> = emptyList()
+    var mixedPlaylists: List<PlaylistsResult> = emptyList()
+    var hasResolvedLibrary: Boolean = false
+    var hasResolvedMixed: Boolean = false
+    var scrollIndex: Int = 0
+    var scrollOffset: Int = 0
+}
+
 @Composable
 fun OnlinePlaylistsScreen(
     onBack: () -> Unit,
@@ -56,9 +70,39 @@ fun OnlinePlaylistsScreen(
     val searchRepository: SearchRepository = remember { GlobalContext.get().get() }
     val libraryPlaylists by playlistRepository.getLibraryPlaylist().collectAsStateWithLifecycle(initialValue = null)
     val mixedPlaylists by playlistRepository.getMixedForYou().collectAsStateWithLifecycle(initialValue = null)
+    var cachedLibraryPlaylists by remember { mutableStateOf(WearOnlinePlaylistsCache.libraryPlaylists) }
+    var cachedMixedPlaylists by remember { mutableStateOf(WearOnlinePlaylistsCache.mixedPlaylists) }
+
+    LaunchedEffect(libraryPlaylists) {
+        libraryPlaylists?.let {
+            cachedLibraryPlaylists = it
+            WearOnlinePlaylistsCache.libraryPlaylists = it
+            WearOnlinePlaylistsCache.hasResolvedLibrary = true
+        }
+    }
+    LaunchedEffect(mixedPlaylists) {
+        mixedPlaylists?.let {
+            cachedMixedPlaylists = it
+            WearOnlinePlaylistsCache.mixedPlaylists = it
+            WearOnlinePlaylistsCache.hasResolvedMixed = true
+        }
+    }
 
     var query by rememberSaveable { mutableStateOf("") }
-    val listState = rememberSaveable(query, saver = LazyListState.Saver) { LazyListState() }
+    val listState =
+        rememberSaveable(query, saver = LazyListState.Saver) {
+            LazyListState(
+                firstVisibleItemIndex = WearOnlinePlaylistsCache.scrollIndex,
+                firstVisibleItemScrollOffset = WearOnlinePlaylistsCache.scrollOffset,
+            )
+        }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) ->
+                WearOnlinePlaylistsCache.scrollIndex = index
+                WearOnlinePlaylistsCache.scrollOffset = offset
+            }
+    }
     var searchLoading by remember(query) { mutableStateOf(false) }
     var searchError by remember(query) { mutableStateOf<String?>(null) }
     var searchPlaylists by remember(query) { mutableStateOf<List<PlaylistsResult>>(emptyList()) }
@@ -148,6 +192,11 @@ fun OnlinePlaylistsScreen(
             FilledTonalButton(
                 onClick = { openWearKeyboard() },
                 modifier = Modifier.fillMaxWidth(),
+                colors =
+                    ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
             ) {
                 Text("Search playlists")
             }
@@ -188,10 +237,15 @@ fun OnlinePlaylistsScreen(
             return@WearList
         }
 
-        val library = libraryPlaylists.orEmpty()
-        val mixed = mixedPlaylists.orEmpty()
+        val library = libraryPlaylists ?: cachedLibraryPlaylists
+        val mixed = mixedPlaylists ?: cachedMixedPlaylists
 
-        if (libraryPlaylists == null && mixedPlaylists == null) {
+        val hasSnapshot =
+            WearOnlinePlaylistsCache.hasResolvedLibrary ||
+                WearOnlinePlaylistsCache.hasResolvedMixed ||
+                library.isNotEmpty() ||
+                mixed.isNotEmpty()
+        if (!hasSnapshot && libraryPlaylists == null && mixedPlaylists == null) {
             item { WearLoadingState("Loading online playlists...") }
             return@WearList
         }
@@ -247,11 +301,19 @@ private fun PlaylistRow(
             Modifier
                 .fillMaxWidth()
                 .clickable(onClick = onClick)
-                .padding(vertical = 8.dp),
+                .background(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
+                    shape = RoundedCornerShape(16.dp),
+                ).border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
+                    shape = RoundedCornerShape(16.dp),
+                ).padding(horizontal = 10.dp, vertical = 10.dp),
     ) {
         Text(
             text = playlist.title,
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -259,7 +321,7 @@ private fun PlaylistRow(
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

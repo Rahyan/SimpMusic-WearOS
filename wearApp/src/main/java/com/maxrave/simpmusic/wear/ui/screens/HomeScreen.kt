@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.wear.compose.material3.Button
+import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
@@ -76,7 +77,7 @@ fun HomeScreen(
                     Modifier
                         .fillMaxWidth()
                         .background(
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
                             shape = RoundedCornerShape(18.dp),
                         ).padding(horizontal = 10.dp, vertical = 10.dp),
             ) {
@@ -85,6 +86,7 @@ fun HomeScreen(
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
                 if (artist.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))
@@ -93,7 +95,7 @@ fun HomeScreen(
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
                     )
                 }
             }
@@ -132,6 +134,13 @@ fun HomeScreen(
             FilledTonalButton(
                 onClick = openNowPlaying,
                 modifier = Modifier.fillMaxWidth(),
+                colors =
+                    ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        disabledContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
+                        disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.62f),
+                    ),
             ) { Text("Now playing") }
         }
         item { Spacer(Modifier.height(6.dp)) }
@@ -139,6 +148,13 @@ fun HomeScreen(
             FilledTonalButton(
                 onClick = openLibrary,
                 modifier = Modifier.fillMaxWidth(),
+                colors =
+                    ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.62f),
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        disabledContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
+                        disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.62f),
+                    ),
             ) { Text("Library") }
         }
         item { Spacer(Modifier.height(6.dp)) }
@@ -147,6 +163,13 @@ fun HomeScreen(
                 onClick = openQueue,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = queueData.data.listTracks.isNotEmpty(),
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.52f),
+                        disabledContentColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.68f),
+                    ),
             ) { Text("Queue (${queueData.data.listTracks.size})") }
         }
     }
