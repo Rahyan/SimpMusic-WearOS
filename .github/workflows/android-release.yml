@@ -3,15 +3,8 @@ name: Build APK for Release (Full & FOSS)
 on:
   workflow_dispatch:
   push:
-    branches:
-      - 'jetpack_compose'
-    paths-ignore:
-      - 'README.md'
-      - 'fastlane/**'
-      - 'assets/**'
-      - '.github/**/*.md'
-      - '.github/FUNDING.yml'
-      - '.github/ISSUE_TEMPLATE/**'
+    tags:
+      - "v*"
 
 permissions:
   contents: write
