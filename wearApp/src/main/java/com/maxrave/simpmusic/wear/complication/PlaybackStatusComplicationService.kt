@@ -8,19 +8,15 @@ import androidx.wear.watchface.complications.data.PlainComplicationText
 import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
-import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
 import com.maxrave.simpmusic.wear.WearMainActivity
 import com.maxrave.simpmusic.wear.tile.SimpMusicTileService
-import org.koin.core.context.GlobalContext
 
 class PlaybackStatusComplicationService : SuspendingComplicationDataSourceService() {
-    private val mediaPlayerHandler: MediaPlayerHandler by lazy { GlobalContext.get().get() }
-
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData? {
         if (request.complicationType != ComplicationType.SHORT_TEXT) return null
-        val nowPlaying = mediaPlayerHandler.nowPlayingState.value
-        val title = nowPlaying.track?.title ?: nowPlaying.songEntity?.title.orEmpty()
-        val isPlaying = mediaPlayerHandler.controlState.value.isPlaying
+        val snapshot = (application as com.maxrave.simpmusic.wear.WearSimpMusicApplication).playbackSurfaces.snapshot()
+        val title = snapshot.title
+        val isPlaying = snapshot.isPlaying
         return createData(
             text = if (title.isBlank()) "App" else if (isPlaying) "II" else "▷",
             title = title.ifBlank { "SimpMusic" },

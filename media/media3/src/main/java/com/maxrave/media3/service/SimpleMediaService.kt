@@ -17,11 +17,9 @@ import com.maxrave.common.R
 import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
 import com.maxrave.logger.Logger
 import com.maxrave.media3.utils.CoilBitmapLoader
-import kotlinx.coroutines.runBlocking
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.koin.core.qualifier.named
-import kotlin.system.exitProcess
 
 @UnstableApi
 internal class SimpleMediaService :
@@ -110,28 +108,6 @@ internal class SimpleMediaService :
     }
 
     @UnstableApi
-    fun release() {
-        Logger.w("Service", "Starting release process")
-        runBlocking {
-            try {
-                // Release MediaSession and Player
-                mediaSession?.run {
-                    this.player.pause()
-                    this.player.playWhenReady = false
-                    this.player.release()
-                    this.release()
-                }
-                // Release handler first (contains coroutines and jobs)
-                simpleMediaServiceHandler.release()
-                mediaSession = null
-                Logger.w("Service", "Simple Media Service Released")
-            } catch (e: Exception) {
-                Logger.e("Service", "Error during release")
-            }
-        }
-    }
-
-    @UnstableApi
     override fun onDestroy() {
         // Ensure the session is released so the service can be recreated in the same process.
         // Otherwise Media3 throws: "Session ID must be unique".
@@ -153,9 +129,15 @@ internal class SimpleMediaService :
     override fun onTaskRemoved(rootIntent: Intent?) {
         Logger.w("Service", "Simple Media Service Task Removed")
         if (simpleMediaServiceHandler.shouldReleaseOnTaskRemoved()) {
-            release()
+            // Player/handler are process singletons also used by the UI and download workers.
+            // Keep them reusable when the task is opened again; never kill unrelated work.
+            simpleMediaServiceHandler.mayBeSaveRecentSong()
+            simpleMediaServiceHandler.mayBeSavePlaybackState()
+            player.pause()
+            player.stop()
+            stopSelf()
+        } else {
             super.onTaskRemoved(rootIntent)
-            exitProcess(0)
         }
     }
 

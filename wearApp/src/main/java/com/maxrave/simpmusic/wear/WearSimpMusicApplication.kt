@@ -11,6 +11,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withTimeout
@@ -30,8 +33,15 @@ class WearSimpMusicApplication : Application() {
     private val _sessionReady = MutableStateFlow(false)
     val sessionReady: StateFlow<Boolean> = _sessionReady
     private var networkBinder: ProcessNetworkBinder? = null
-    private var lastPublishedPlayback: Triple<String, String, Boolean>? = null
+    val playbackSurfaces by lazy { WearPlaybackSurfaces(this) }
+    @Volatile var playbackHandler: com.maxrave.domain.mediaservice.handler.MediaPlayerHandler? = null
+        private set
     private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val cachePreparation = Mutex()
+
+    suspend fun preparePlaybackCaches() = cachePreparation.withLock {
+        withContext(Dispatchers.IO) { GlobalContext.get().get<com.maxrave.domain.repository.CacheRepository>(); Unit }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -46,27 +56,11 @@ class WearSimpMusicApplication : Application() {
 
         startKoin {
             androidContext(this@WearSimpMusicApplication)
-            loadAllModules()
-        }
-
-        startupScope.launch(Dispatchers.Main.immediate) {
-            val handler: com.maxrave.domain.mediaservice.handler.MediaPlayerHandler = GlobalContext.get().get()
-            kotlinx.coroutines.flow.combine(handler.nowPlayingState, handler.controlState) { now, control ->
-                Triple(now.mediaItem.mediaId, now.track?.title ?: now.songEntity?.title.orEmpty(), control.isPlaying)
-            }.collect { state ->
-                if (state != lastPublishedPlayback) {
-                    lastPublishedPlayback = state
-                    try {
-                        androidx.wear.tiles.TileService.getUpdater(this@WearSimpMusicApplication)
-                            .requestUpdate(com.maxrave.simpmusic.wear.tile.SimpMusicTileService::class.java)
-                    } catch (_: SecurityException) { Logger.w("WearSurface", "System denied tile refresh") }
-                    try {
-                        androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester.create(
-                        this@WearSimpMusicApplication, android.content.ComponentName(this@WearSimpMusicApplication,
-                            com.maxrave.simpmusic.wear.complication.PlaybackStatusComplicationService::class.java)).requestUpdateAll()
-                    } catch (_: SecurityException) { Logger.w("WearSurface", "System denied complication refresh") }
-                }
-            }
+            loadAllModules(
+                onMediaItemChanged = { playbackSurfaces.onMediaItemChanged(it) },
+                onPlayingChanged = { _, playing -> playbackSurfaces.onPlayingChanged(playing) },
+                onPlaybackCreated = { playbackHandler = it },
+            )
         }
         startupScope.launch {
             runCatching {
@@ -91,4 +85,5 @@ class WearSimpMusicApplication : Application() {
         networkBinder = null
         super.onTerminate()
     }
+
 }

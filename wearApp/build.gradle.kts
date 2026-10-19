@@ -114,6 +114,7 @@ dependencies {
     implementation(libs.material)
     // Wear Data Layer (phone-assisted login, etc.)
     implementation(libs.play.services.wearable)
+    implementation(libs.media3.common)
     implementation(libs.work.runtime.ktx)
     implementation(libs.kotlinx.serialization.json)
 

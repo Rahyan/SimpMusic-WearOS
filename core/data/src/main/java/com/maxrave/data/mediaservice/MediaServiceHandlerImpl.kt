@@ -196,6 +196,7 @@ internal class MediaServiceHandlerImpl(
     private var trimmingRadio = false
     private val saveQueueMutex = Mutex()
     private var savePlaybackEnabled = false
+    @Volatile private var killServiceOnExit = false
     private var skipSilent = false
 
     private var normalizeVolume = false
@@ -270,6 +271,7 @@ internal class MediaServiceHandlerImpl(
             }
         }
         coroutineScope.launch { dataStoreManager.saveStateOfPlayback.collect { savePlaybackEnabled = it == TRUE } }
+        coroutineScope.launch { dataStoreManager.killServiceOnExit.collect { killServiceOnExit = it == TRUE } }
         coroutineScope.launch {
             val generation = queueGeneration
             if (dataStoreManager.saveStateOfPlayback.first() == TRUE) {
@@ -691,10 +693,12 @@ internal class MediaServiceHandlerImpl(
             PlayerEvent.Backward -> player.seekBack()
             PlayerEvent.Forward -> player.seekForward()
             PlayerEvent.PlayPause -> {
+                if (player.mediaItemCount == 0) return
                 if (player.isPlaying) {
                     player.pause()
                     stopProgressUpdate()
                 } else {
+                    if (player.playbackState == PlayerConstants.STATE_IDLE && player.mediaItemCount > 0) player.prepare()
                     player.play()
                     startProgressUpdate()
                 }
@@ -974,7 +978,7 @@ internal class MediaServiceHandlerImpl(
 
     override fun loadMore() {
         // A prepared offline queue is finite, even when the ordinary Endless queue setting is enabled.
-        if (queueData.value.data.playlistId == "wear_offline_queue") return
+        if (queueData.value.data.playlistId?.startsWith("wear_offline_") == true) return
         if (queueData.value.queueState == QueueData.StateSource.STATE_INITIALIZING) return
         val generation = queueGeneration
         // Separate local and remote data
@@ -2019,10 +2023,7 @@ internal class MediaServiceHandlerImpl(
         }
     }
 
-    override fun shouldReleaseOnTaskRemoved() =
-        runBlocking {
-            dataStoreManager.killServiceOnExit.first() == TRUE
-        }
+    override fun shouldReleaseOnTaskRemoved() = killServiceOnExit
 
     override fun release() {
         if (released) return
@@ -2188,6 +2189,7 @@ internal class MediaServiceHandlerImpl(
             if (mediaItem != null) {
                 getDataOfNowPlayingState(mediaItem)
             } else {
+                updateWidget(null)
                 _nowPlayingState.update {
                     NowPlayingTrackState
                         .initial()
@@ -2195,7 +2197,7 @@ internal class MediaServiceHandlerImpl(
             }
         }
         queueData.value.data.listTracks.let { list ->
-            if (queueData.value.data.playlistId != "wear_offline_queue" && (list.size > 3 || endlessQueueEnabled) &&
+            if (queueData.value.data.playlistId?.startsWith("wear_offline_") != true && (list.size > 3 || endlessQueueEnabled) &&
                 list.size - player.currentMediaItemIndex < 3 &&
                 list.size - player.currentMediaItemIndex >= 0 &&
                 queueData.value.queueState == QueueData.StateSource.STATE_INITIALIZED

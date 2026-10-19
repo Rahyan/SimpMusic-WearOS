@@ -57,6 +57,7 @@ private const val KEY_WEAR_LOGIN_MESSAGE = "wear_login_message"
 private const val PATH_LOGIN_COOKIE = "/simpmusic/login/cookie"
 private const val PATH_LOGIN_STATUS = "/simpmusic/login/status"
 
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class WearDataLayerListenerService : WearableListenerService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val requestMutex = Mutex()
@@ -171,8 +172,9 @@ class WearDataLayerListenerService : WearableListenerService() {
                         WearCompanionBridge.ACTION_SYNC_ARTIST -> handleSyncArtist(sourceNodeId, requestId, payload)
                         WearCompanionBridge.ACTION_SYNC_PODCAST -> handleSyncPodcast(sourceNodeId, requestId, payload)
                         WearCompanionBridge.ACTION_SYNC_DOWNLOAD -> handleSyncDownload(sourceNodeId, requestId, payload)
-                        WearCompanionBridge.ACTION_REMOTE -> withContext(Dispatchers.Main.immediate) {
-                            handleRemote(sourceNodeId, requestId, payload)
+                        WearCompanionBridge.ACTION_REMOTE -> {
+                            (application as com.maxrave.simpmusic.wear.WearSimpMusicApplication).preparePlaybackCaches()
+                            withContext(Dispatchers.Main.immediate) { handleRemote(sourceNodeId, requestId, payload) }
                         }
                         else ->
                             sendCompanionResponse(
@@ -230,72 +232,78 @@ class WearDataLayerListenerService : WearableListenerService() {
         sourceNodeId: String,
         requestId: String,
     ) {
-        val dataStoreManager: DataStoreManager = GlobalContext.get().get()
-        val accountRepository: AccountRepository = GlobalContext.get().get()
-        val mediaPlayerHandler: MediaPlayerHandler = GlobalContext.get().get()
-        val accountCount = accountRepository.getGoogleAccounts().first()?.size ?: 0
-        val queueSize = mediaPlayerHandler.queueData.value?.data?.listTracks?.size ?: 0
-        val nowPlaying = mediaPlayerHandler.nowPlayingState.value.songEntity?.videoId.orEmpty()
-        val diagnostics =
-            JSONObject()
-                .put("model", Build.MODEL)
-                .put("sdkInt", Build.VERSION.SDK_INT)
-                .put("appVersion", BuildConfig.VERSION_NAME)
-                .put("loggedIn", dataStoreManager.loggedIn.first() == DataStoreManager.TRUE)
-                .put("hasCookie", dataStoreManager.cookie.first().isNotBlank())
-                .put("hasSpotifySpdc", dataStoreManager.spdc.first().isNotBlank())
-                .put("accountCount", accountCount)
-                .put("queueSize", queueSize)
-                .put("nowPlayingVideoId", nowPlaying)
-        val state = playbackData()
-        diagnostics.put("libraryGeneration", libraryGeneration())
-            .put("protocolVersion", WearCompanionBridge.PROTOCOL_VERSION)
-            .put("capabilities", JSONArray(listOf("playback", "queue", "logout", "reconcile", "offline_queue")))
-            .put("playback", state.getJSONObject("playback"))
-        sendCompanionResponse(
-            sourceNodeId = sourceNodeId,
-            requestId = requestId,
-            action = WearCompanionBridge.ACTION_STATUS,
-            ok = true,
-            message = "Watch diagnostics ready.",
-            data = diagnostics,
-        )
-    }
+        (application as com.maxrave.simpmusic.wear.WearSimpMusicApplication).preparePlaybackCaches()
+        withContext(Dispatchers.Main.immediate) {
+            val dataStoreManager: DataStoreManager = GlobalContext.get().get()
+            val accountRepository: AccountRepository = GlobalContext.get().get()
+            val mediaPlayerHandler: MediaPlayerHandler = GlobalContext.get().get()
+            val accountCount = accountRepository.getGoogleAccounts().first()?.size ?: 0
+            val queueSize = mediaPlayerHandler.queueData.value?.data?.listTracks?.size ?: 0
+            val nowPlaying = mediaPlayerHandler.nowPlayingState.value.songEntity?.videoId.orEmpty()
+            val diagnostics =
+                JSONObject()
+                    .put("model", Build.MODEL)
+                    .put("sdkInt", Build.VERSION.SDK_INT)
+                    .put("appVersion", BuildConfig.VERSION_NAME)
+                    .put("loggedIn", dataStoreManager.loggedIn.first() == DataStoreManager.TRUE)
+                    .put("hasCookie", dataStoreManager.cookie.first().isNotBlank())
+                    .put("hasSpotifySpdc", dataStoreManager.spdc.first().isNotBlank())
+                    .put("accountCount", accountCount)
+                    .put("queueSize", queueSize)
+                    .put("nowPlayingVideoId", nowPlaying)
+            val state = playbackData()
+            diagnostics.put("libraryGeneration", libraryGeneration())
+                .put("protocolVersion", WearCompanionBridge.PROTOCOL_VERSION)
+                .put("capabilities", JSONArray(listOf("playback", "queue", "logout", "reconcile", "offline_queue")))
+                .put("playback", state.getJSONObject("playback"))
+            sendCompanionResponse(
+                sourceNodeId = sourceNodeId,
+                requestId = requestId,
+                action = WearCompanionBridge.ACTION_STATUS,
+                ok = true,
+                message = "Watch diagnostics ready.",
+                data = diagnostics,
+            )
+                }
+        }
 
-    private suspend fun playbackData(): JSONObject = withContext(Dispatchers.Main.immediate) {
-        val handler: MediaPlayerHandler = GlobalContext.get().get()
-        val current = handler.nowPlayingState.value
-        val item = handler.player.currentMediaItem
-        val controls = handler.controlState.value
-        val tracks = handler.queueData.value?.data?.listTracks.orEmpty()
-        val currentIndex = handler.player.currentMediaItemIndex
-        val start = (currentIndex - 10).coerceAtLeast(0)
-        val queue = JSONArray()
-        tracks.drop(start).take(40).forEachIndexed { offset, track ->
-            queue.put(JSONObject().put("index", start + offset).put("videoId", track.videoId)
-                .put("title", track.title.take(160)).put("artist", track.artists?.joinToString { it.name }.orEmpty().take(512)))
+    private suspend fun playbackData(): JSONObject {
+        (application as com.maxrave.simpmusic.wear.WearSimpMusicApplication).preparePlaybackCaches()
+        return withContext(Dispatchers.Main.immediate) {
+            val handler: MediaPlayerHandler = GlobalContext.get().get()
+            val current = handler.nowPlayingState.value
+            val item = handler.player.currentMediaItem
+            val controls = handler.controlState.value
+            val tracks = handler.queueData.value?.data?.listTracks.orEmpty()
+            val currentIndex = handler.player.currentMediaItemIndex
+            val start = (currentIndex - 10).coerceAtLeast(0)
+            val queue = JSONArray()
+            tracks.drop(start).take(40).forEachIndexed { offset, track ->
+                queue.put(JSONObject().put("index", start + offset).put("videoId", track.videoId)
+                    .put("title", track.title.take(160)).put("artist", track.artists?.joinToString { it.name }.orEmpty().take(512)))
+            }
+            val audio = getSystemService(AudioManager::class.java)
+            val state = JSONObject().put("generatedAt", System.currentTimeMillis())
+                .put("title", (item?.metadata?.title ?: current.songEntity?.title ?: current.track?.title ?: current.mediaItem.metadata.title).orEmpty().take(512))
+                .put("artist", (item?.metadata?.artist ?: current.songEntity?.artistName?.joinToString() ?: current.track?.artists?.joinToString { it.name }
+                    ?: current.mediaItem.metadata.artist).orEmpty().take(512))
+                .put("artwork", (item?.metadata?.artworkUri ?: current.songEntity?.thumbnails ?: current.track?.thumbnails?.lastOrNull()?.url).orEmpty().take(2048))
+                .put("videoId", item?.mediaId ?: current.songEntity?.videoId ?: current.track?.videoId ?: current.mediaItem.mediaId)
+                .put("isPlaying", handler.player.isPlaying)
+                // Loading also describes buffer fill during healthy playback; only the player state means a stall.
+                .put("isBuffering", handler.player.playbackState == com.maxrave.domain.data.player.PlayerConstants.STATE_BUFFERING)
+                .put("positionMs", handler.getProgress().coerceAtLeast(0))
+                .put("durationMs", handler.getPlayerDuration().coerceAtLeast(0))
+                .put("canNext", controls.isNextAvailable).put("canPrevious", controls.isPreviousAvailable)
+                .put("queueRevision", bridgeDigest(tracks.joinToString("\n") { it.videoId }))
+                .put("queueSize", tracks.size).put("currentIndex", currentIndex).put("queue", queue)
+                .put("volume", audio?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0)
+                .put("maxVolume", audio?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 0)
+            val offline = withContext(Dispatchers.IO) {
+                com.maxrave.simpmusic.wear.offline.OfflineQueue(applicationContext).status(GlobalContext.get().get()).toJson()
+            }
+            JSONObject().put("protocolVersion", WearCompanionBridge.PROTOCOL_VERSION).put("playback", state).put("offlinePack", offline)
         }
-        val audio = getSystemService(AudioManager::class.java)
-        val state = JSONObject().put("generatedAt", System.currentTimeMillis())
-            .put("title", (item?.metadata?.title ?: current.songEntity?.title ?: current.track?.title ?: current.mediaItem.metadata.title).orEmpty().take(512))
-            .put("artist", (item?.metadata?.artist ?: current.songEntity?.artistName?.joinToString() ?: current.track?.artists?.joinToString { it.name }
-                ?: current.mediaItem.metadata.artist).orEmpty().take(512))
-            .put("artwork", (item?.metadata?.artworkUri ?: current.songEntity?.thumbnails ?: current.track?.thumbnails?.lastOrNull()?.url).orEmpty().take(2048))
-            .put("videoId", item?.mediaId ?: current.songEntity?.videoId ?: current.track?.videoId ?: current.mediaItem.mediaId)
-            .put("isPlaying", handler.player.isPlaying)
-            // Loading also describes buffer fill during healthy playback; only the player state means a stall.
-            .put("isBuffering", handler.player.playbackState == com.maxrave.domain.data.player.PlayerConstants.STATE_BUFFERING)
-            .put("positionMs", handler.getProgress().coerceAtLeast(0))
-            .put("durationMs", handler.getPlayerDuration().coerceAtLeast(0))
-            .put("canNext", controls.isNextAvailable).put("canPrevious", controls.isPreviousAvailable)
-            .put("queueRevision", bridgeDigest(tracks.joinToString("\n") { it.videoId }))
-            .put("queueSize", tracks.size).put("currentIndex", currentIndex).put("queue", queue)
-            .put("volume", audio?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0)
-            .put("maxVolume", audio?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 0)
-        val offline = withContext(Dispatchers.IO) {
-            com.maxrave.simpmusic.wear.offline.OfflineQueue(applicationContext).status(GlobalContext.get().get()).toJson()
-        }
-        JSONObject().put("protocolVersion", WearCompanionBridge.PROTOCOL_VERSION).put("playback", state).put("offlinePack", offline)
     }
 
     private suspend fun handleLogout(sourceNodeId: String, requestId: String) {
@@ -668,6 +676,14 @@ class WearDataLayerListenerService : WearableListenerService() {
                     "The queue changed. Refresh it and try again.", playbackData())
                 return
             }
+        }
+        if (command in setOf(WearCompanionBridge.REMOTE_PLAY_PAUSE, WearCompanionBridge.REMOTE_NEXT,
+                WearCompanionBridge.REMOTE_PREVIOUS, WearCompanionBridge.REMOTE_QUEUE_PLAY,
+                WearCompanionBridge.REMOTE_HANDOFF_QUEUE, WearCompanionBridge.REMOTE_PLAY_OFFLINE)) {
+            require(command != WearCompanionBridge.REMOTE_PLAY_PAUSE || mediaPlayerHandler.player.mediaItemCount > 0) {
+                "Choose a track on the watch first."
+            }
+            com.maxrave.media3.service.PlaybackServiceConnection.get(applicationContext).ensureConnected()
         }
         when (command) {
             WearCompanionBridge.REMOTE_PREPARE_OFFLINE -> {

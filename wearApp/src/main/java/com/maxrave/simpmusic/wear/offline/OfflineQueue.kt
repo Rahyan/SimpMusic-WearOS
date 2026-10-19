@@ -32,7 +32,8 @@ class OfflineQueue(private val context: Context) {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false; encodeDefaults = true }
     fun tracks(): List<Track> = runCatching { json.decodeFromString<List<Track>>(prefs.getString("tracks", "[]")!!) }.getOrDefault(emptyList())
     fun revision(): String = prefs.getString("revision", "").orEmpty()
-    fun chargingOnly(): Boolean = prefs.getBoolean("charging", true)
+    fun chargingOnly(): Boolean = context.getSharedPreferences("watch_download_policy", Context.MODE_PRIVATE)
+        .getBoolean("charging", prefs.getBoolean("charging", true))
     fun message(value: String) { prefs.edit().putString("message", value).apply() }
     suspend fun <T> withRevision(expected: String, block: suspend () -> T): T? = mutation.withLock {
         if (revision() != expected) null else block()
@@ -44,7 +45,8 @@ class OfflineQueue(private val context: Context) {
         val revision = UUID.randomUUID().toString()
         check(prefs.edit().putString("tracks", json.encodeToString(tracks)).putString("revision", revision)
             .putBoolean("charging", chargingOnly).putString("message", "Preparing download requests…").commit())
-        enqueue(revision, chargingOnly)
+        updateDownloadPolicy(chargingOnly)
+        enqueue(revision)
         }
     }
 
@@ -52,12 +54,19 @@ class OfflineQueue(private val context: Context) {
         mutation.withLock {
         require(tracks().isNotEmpty()) { "Prepare an offline queue first." }
         check(prefs.edit().putBoolean("charging", chargingOnly).putString("message", "Preparing download requests…").commit())
-        enqueue(revision(), chargingOnly)
+        updateDownloadPolicy(chargingOnly)
+        enqueue(revision())
         }
     }
-    private fun enqueue(revision: String, chargingOnly: Boolean) {
+    private suspend fun updateDownloadPolicy(chargingOnly: Boolean) {
+        (context.applicationContext as com.maxrave.simpmusic.wear.WearSimpMusicApplication).preparePlaybackCaches()
+        val downloads: DownloadHandler = withContext(Dispatchers.Main.immediate) { GlobalContext.get().get() }
+        downloads.setWatchDownloadPolicy(chargingOnly)
+    }
+
+    private fun enqueue(revision: String) {
         val request = OneTimeWorkRequestBuilder<OfflineQueueWorker>()
-            .setInputData(workDataOf("revision" to revision, "charging" to chargingOnly))
+            .setInputData(workDataOf("revision" to revision))
             .setBackoffCriteria(BackoffPolicy.LINEAR, 1, TimeUnit.MINUTES).build()
         WorkManager.getInstance(context).enqueueUniqueWork("watch-offline-queue", ExistingWorkPolicy.REPLACE, request)
     }
@@ -81,7 +90,8 @@ class OfflineQueue(private val context: Context) {
     }
     suspend fun play(handler: MediaPlayerHandler) {
         mutation.withLock {
-        val ready = withContext(Dispatchers.IO) { readyTracks(GlobalContext.get().get()) }
+        val downloads: DownloadHandler = withContext(Dispatchers.Main.immediate) { GlobalContext.get().get() }
+        val ready = withContext(Dispatchers.IO) { readyTracks(downloads) }
         require(ready.isNotEmpty()) { "No verified offline tracks are ready yet." }
         withContext(Dispatchers.Main.immediate) {
             handler.resetSongAndQueue()
@@ -97,10 +107,12 @@ class OfflineQueueWorker(context: Context, parameters: WorkerParameters) : Corou
         val store = OfflineQueue(applicationContext)
         val expected = inputData.getString("revision") ?: return Result.failure()
         if (store.revision() != expected) return Result.success()
-        val downloads: DownloadHandler = GlobalContext.get().get()
-        val songs: SongRepository = GlobalContext.get().get()
         return try {
-            store.withRevision(expected) { downloads.setWatchDownloadPolicy(inputData.getBoolean("charging", true)) }
+            (applicationContext as com.maxrave.simpmusic.wear.WearSimpMusicApplication).preparePlaybackCaches()
+            val downloads: DownloadHandler = withContext(Dispatchers.Main.immediate) { GlobalContext.get().get() }
+            val songs: SongRepository = GlobalContext.get().get()
+            // Policy is applied when requested and restored by the downloader on cold creation.
+            // An old background retry must not overwrite a newer global choice.
             val ready = downloads.completedAudioIds()
             for (track in store.tracks().distinctBy { it.videoId }) {
                 if (track.videoId in ready) continue

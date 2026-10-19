@@ -13,12 +13,9 @@ import androidx.wear.tiles.TileBuilders
 import androidx.wear.tiles.TileService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
-import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
 import com.maxrave.simpmusic.wear.WearMainActivity
-import org.koin.core.context.GlobalContext
 
 class SimpMusicTileService : TileService() {
-    private val mediaPlayerHandler: MediaPlayerHandler by lazy { GlobalContext.get().get() }
 
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> {
         val uiState = readTileUiState()
@@ -199,9 +196,9 @@ class SimpMusicTileService : TileService() {
 
     private fun readTileUiState(): TileUiState =
         runCatching {
-            val nowPlaying = mediaPlayerHandler.nowPlayingState.value
-            val trackTitle = nowPlaying.track?.title ?: nowPlaying.songEntity?.title.orEmpty()
-            val isPlaying = mediaPlayerHandler.controlState.value.isPlaying
+            val snapshot = (application as com.maxrave.simpmusic.wear.WearSimpMusicApplication).playbackSurfaces.snapshot()
+            val trackTitle = snapshot.title
+            val isPlaying = snapshot.isPlaying
             TileUiState(
                 isPlaying = isPlaying,
                 status =

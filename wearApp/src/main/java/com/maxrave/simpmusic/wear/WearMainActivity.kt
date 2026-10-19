@@ -23,6 +23,9 @@ import org.koin.android.ext.android.inject
 
 class WearMainActivity : ComponentActivity() {
     private val mediaPlayerHandler: MediaPlayerHandler by inject()
+    private var readyHandler by androidx.compose.runtime.mutableStateOf<MediaPlayerHandler?>(null)
+    private var startupFailed by androidx.compose.runtime.mutableStateOf(false)
+    private var startupJob: kotlinx.coroutines.Job? = null
 
     private val debugVideoId: String?
         get() = intent?.getStringExtra(EXTRA_DEBUG_VIDEO_ID)
@@ -52,14 +55,54 @@ class WearMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         consumeTileActionFromIntent(intent)
+        preparePlayback()
         setContent {
             WearTheme {
-                WearAppRoot(mediaPlayerHandler = mediaPlayerHandler, requestedRoute = tileRoute, onRouteHandled = { tileRoute = null })
+                val handler = readyHandler
+                if (handler != null) {
+                    WearAppRoot(mediaPlayerHandler = handler, requestedRoute = tileRoute, onRouteHandled = { tileRoute = null })
+                } else {
+                    com.maxrave.simpmusic.wear.ui.components.WearList {
+                        item {
+                            if (startupFailed) com.maxrave.simpmusic.wear.ui.components.WearErrorState(
+                                "Couldn’t open the player.", "Retry", { preparePlayback() })
+                            else com.maxrave.simpmusic.wear.ui.components.WearLoadingState("Opening your music…")
+                        }
+                    }
+                }
             }
         }
     }
 
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    private fun preparePlayback() {
+        if (startupJob?.isActive == true) return
+        startupFailed = false
+        startupJob = lifecycleScope.launch {
+            try {
+                (application as WearSimpMusicApplication).preparePlaybackCaches()
+                val handler = mediaPlayerHandler
+                com.maxrave.media3.service.PlaybackServiceConnection.get(applicationContext).ensureConnected()
+                readyHandler = handler
+                if (lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) bindPlayback()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                startupFailed = true
+            }
+        }
+    }
+
+    private fun bindPlayback() {
+        if (shouldUnbind || readyHandler == null) return
+        mediaPlayerHandler.startMediaService(this, serviceConnection)
+        shouldUnbind = true
+        maybeDebugAutoplay()
+        dispatchPendingTileAction()
+    }
+
     private fun maybeDebugAutoplay() {
+        if (readyHandler == null) return
         if (!BuildConfig.DEBUG) return
         val videoId = debugVideoId?.trim().orEmpty()
         if (videoId.isBlank()) return
@@ -99,10 +142,7 @@ class WearMainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        mediaPlayerHandler.startMediaService(this, serviceConnection)
-        shouldUnbind = true
-        maybeDebugAutoplay()
-        dispatchPendingTileAction()
+        bindPlayback()
     }
 
     override fun onStop() {
@@ -137,6 +177,7 @@ class WearMainActivity : ComponentActivity() {
     }
 
     private fun dispatchPendingTileAction() {
+        if (readyHandler == null) return
         val tileAction = pendingTileAction ?: return
         pendingTileAction = null
         lifecycleScope.launch {

@@ -6,7 +6,11 @@ import com.maxrave.data.di.repositoryModule
 import com.maxrave.media3.di.loadMediaService
 import org.koin.core.context.loadKoinModules
 
-fun loadAllModules() {
+fun loadAllModules(
+    onMediaItemChanged: (com.maxrave.domain.data.player.GenericMediaItem?) -> Unit = {},
+    onPlayingChanged: (android.content.Context, Boolean) -> Unit = { _, _ -> },
+    onPlaybackCreated: (com.maxrave.domain.mediaservice.handler.MediaPlayerHandler) -> Unit = {},
+) {
     loadKoinModules(
         listOf(
             databaseModule,
@@ -14,5 +18,5 @@ fun loadAllModules() {
         ),
     )
     loadMediaService()
-    loadKoinModules(mediaHandlerModule)
+    loadKoinModules(mediaHandlerModule(onMediaItemChanged, onPlayingChanged, onPlaybackCreated))
 }
