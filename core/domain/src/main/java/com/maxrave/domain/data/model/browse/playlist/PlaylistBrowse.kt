@@ -18,4 +18,6 @@ data class PlaylistBrowse(
     val year: String,
     val shuffleEndpoint: YouTubeWatchEndpoint? = null,
     val radioEndpoint: YouTubeWatchEndpoint? = null,
+    /** True only when all pages and track rows were decoded; required for offline reconciliation. */
+    val isComplete: Boolean = false,
 )

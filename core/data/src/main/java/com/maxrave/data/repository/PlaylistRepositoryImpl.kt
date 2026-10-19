@@ -2,6 +2,7 @@ package com.maxrave.data.repository
 
 import android.content.Context
 import com.maxrave.common.R
+import com.maxrave.common.matchesReportedPlaylistCount
 import com.maxrave.data.db.LocalDataSource
 import com.maxrave.data.extension.getFullDataFromDB
 import com.maxrave.data.mapping.toListTrack
@@ -25,8 +26,10 @@ import com.maxrave.domain.utils.Resource
 import com.maxrave.domain.utils.toTrack
 import com.maxrave.kotlinytmusicscraper.YouTube
 import com.maxrave.kotlinytmusicscraper.models.MusicShelfRenderer
+import com.maxrave.kotlinytmusicscraper.models.SectionListRenderer
 import com.maxrave.kotlinytmusicscraper.models.SongItem
 import com.maxrave.kotlinytmusicscraper.models.WatchEndpoint
+import com.maxrave.kotlinytmusicscraper.models.response.BrowseResponse
 import com.maxrave.kotlinytmusicscraper.pages.NextPage
 import com.maxrave.kotlinytmusicscraper.parser.getPlaylistContinuation
 import com.maxrave.kotlinytmusicscraper.parser.getPlaylistRadioEndpoint
@@ -366,65 +369,58 @@ internal class PlaylistRepositoryImpl(
                                     ?.header
                                     ?.musicResponsiveHeaderRenderer
                         Logger.d("getPlaylistData", "header: $header")
-                        var continueParam =
-                            result.getPlaylistContinuation()
-                        var count = 0
-                        Logger.d("getPlaylistData", "playlist data: ${listContent.size}")
-                        Logger.d("getPlaylistData", "continueParam: $continueParam")
-//                        else {
-//                            var listTrack = playlistBrowse.tracks.toMutableList()
-                        while (continueParam != null) {
-                            youTube
-                                .customQuery(
-                                    browseId = null,
-                                    continuation = continueParam,
-                                    setLogin = true,
-                                ).onSuccess { values ->
-                                    Logger.d("getPlaylistData", "continue: $continueParam")
-                                    Logger.d(
-                                        "getPlaylistData",
-                                        "values: ${values.onResponseReceivedActions}",
-                                    )
-                                    val dataMore: List<SongItem> =
-                                        values.onResponseReceivedActions
-                                            ?.firstOrNull()
-                                            ?.appendContinuationItemsAction
-                                            ?.continuationItems
-                                            ?.apply {
-                                                Logger.w("getPlaylistData", "dataMore: ${this.size}")
-                                            }?.mapNotNull {
-                                                NextPage.fromMusicResponsiveListItemRenderer(
-                                                    it.musicResponsiveListItemRenderer ?: return@mapNotNull null,
-                                                )
-                                            } ?: emptyList()
-                                    listContent.addAll(dataMore.map { it.toTrack() })
-                                    continueParam =
-                                        values.getPlaylistContinuation()
-                                    count++
-                                }.onFailure {
-                                    Logger.e("getPlaylistData", "Error: ${it.message}")
-                                    continueParam = null
-                                    count++
-                                }
+                        val countTexts = when (header) {
+                            is BrowseResponse.Header.MusicDetailHeaderRenderer ->
+                                header.secondSubtitle.runs?.map { it.text }
+                            is BrowseResponse.Header.MusicEditablePlaylistDetailHeaderRenderer ->
+                                header.header.musicDetailHeaderRenderer?.secondSubtitle?.runs?.map { it.text }
+                                    ?: header.header.musicResponsiveHeaderRenderer?.secondSubtitle?.runs?.map { it.text }
+                            is SectionListRenderer.Content.MusicResponsiveHeaderRenderer ->
+                                header.secondSubtitle?.runs?.map { it.text }
+                            else -> null
                         }
+                        val reportedCount = countTexts?.let { if (it.size >= 5) it.getOrNull(2) else it.firstOrNull() }
+                        var completeRows = true
+                        listContent.addAll(com.maxrave.common.collectPlaylistPages<Track>(
+                            initial = emptyList(), firstToken = result.getPlaylistContinuation(),
+                        ) { token ->
+                            val values = youTube.customQuery(browseId = null, continuation = token, setLogin = true).getOrThrow()
+                            val pages = values.onResponseReceivedActions?.mapNotNull { it.appendContinuationItemsAction?.continuationItems }
+                            val rows = pages?.flatten().orEmpty()
+                            if (pages.isNullOrEmpty()) completeRows = false
+                            val tracks = rows.mapNotNull { item ->
+                                    item.musicResponsiveListItemRenderer?.let { renderer ->
+                                        NextPage.fromMusicResponsiveListItemRenderer(renderer)?.toTrack()
+                                    }
+                                }
+                            if (rows.count { it.continuationItemRenderer == null } != tracks.size) completeRows = false
+                            tracks to values.getPlaylistContinuation()
+                        })
                         Logger.d("getPlaylistData", "playlist final data: ${listContent.size}")
                         parsePlaylistData(header, data ?: emptyList(), playlistId, context)?.let { playlist ->
+                            val allTracks = playlist.tracks + listContent
+                            val initialRows = data.orEmpty().count { it.continuationItemRenderer == null }
+                            val complete = data != null && completeRows && initialRows == playlist.tracks.size &&
+                                allTracks.all { it.videoId.isNotBlank() && it.title.isNotBlank() } &&
+                                matchesReportedPlaylistCount(reportedCount, allTracks.size)
                             emit(
                                 Resource.Success<PlaylistBrowse>(
                                     playlist.copy(
-                                        tracks =
-                                            playlist.tracks.toMutableList().apply {
-                                                addAll(listContent)
-                                            },
-                                        trackCount = (playlist.trackCount + listContent.size),
+                                        tracks = allTracks,
+                                        trackCount = allTracks.size,
+                                        isComplete = complete,
                                     ),
                                 ),
                             )
                         } ?: emit(Resource.Error<PlaylistBrowse>("Error"))
                     }.onFailure { e ->
+                        if (e is kotlinx.coroutines.CancellationException) throw e
                         Logger.e("getPlaylistData", e.message ?: "Error")
                         emit(Resource.Error<PlaylistBrowse>(e.message.toString()))
                     }
+            }.onFailure { failure ->
+                if (failure is kotlinx.coroutines.CancellationException) throw failure
+                emit(Resource.Error<PlaylistBrowse>("Couldn’t load the complete playlist. Try again."))
             }
         }.flowOn(Dispatchers.IO)
 
