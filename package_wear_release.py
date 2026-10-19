@@ -114,6 +114,14 @@ def main():
         manifest = {'package': wear_identity['name'], 'version_name': version,
             'version_code': int(wear_identity['versionCode']), 'certificate_sha256': certificates.pop(),
             'test_only': args.allow_test_key, 'artifacts': results}
+        try:
+            checkout = Path(__file__).resolve().parent
+            git = ['git', '-c', 'safe.directory='+str(checkout), '-c', 'core.filemode=false', '-C', checkout]
+            manifest['source_revision'] = run(*git, 'rev-parse', 'HEAD').strip()
+            manifest['source_dirty'] = bool(run(*git, 'status', '--porcelain').strip())
+        except (OSError, subprocess.CalledProcessError):
+            manifest['source_revision'] = None
+            manifest['source_dirty'] = True
         args.output.mkdir(parents=True, exist_ok=True)
         for apk in outputs:
             (args.output / apk.name).write_bytes(apk.read_bytes())

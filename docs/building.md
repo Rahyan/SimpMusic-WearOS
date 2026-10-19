@@ -101,7 +101,7 @@ On Linux, `bash ./build_wear_release.sh` builds, aligns, signs and verifies matc
 
 Signed outputs go to `build/release/`, or `OUTPUT_DIR`. Choose an empty directory for each build so older APKs cannot be mixed into the result. The helper produces a complete watch APK for each included ARM ABI, an ARM universal watch APK when both ABIs are present, the companion, `SHA256SUMS` and `release-manifest.json`. Each APK is independently installable. Smaller watch files come from the same minified build with the other ABI's native libraries removed, then are aligned, signed and checked again.
 
-Packaging checks matching package/version/certificate, non-debuggable manifests, native payloads and final 16 KB alignment. It rejects Android debug keys and test package names for public packaging. Keep the production signing key and its password backed up securely between releases; a newly generated key cannot update an existing install with its data intact. Do not publish outputs produced with the local-only `--allow-test-key` option.
+Packaging checks matching package/version/certificate, non-debuggable manifests, native payloads and final 16 KB alignment. Its manifest also records the source commit and whether the checkout has uncommitted changes. It rejects Android debug keys and test package names for public packaging. Keep the production signing key and its password backed up securely between releases; a newly generated key cannot update an existing install with its data intact. Do not publish outputs produced with the local-only `--allow-test-key` option.
 
 After an unsigned Gradle build, the same packaging step works on Windows using `python package_wear_release.py`:
 
@@ -115,7 +115,7 @@ python3 package_wear_release.py \
 
 Set `KEYSTORE_PASSWORD` and `KEY_PASSWORD` in the process environment first. In PowerShell, replace the Unix continuations and environment-variable syntax with their PowerShell equivalents, or place the command on one line. Validate downloads with `sha256sum -c SHA256SUMS` on Linux or `Get-FileHash <apk> -Algorithm SHA256` on Windows. Compare the APK's hash to its entry in `SHA256SUMS`.
 
-The unsigned GitHub workflow builds and checks the apps. The release workflow signs artifacts on version tags or manual dispatch; it needs the signing secrets configured by the maintainer. Neither workflow is a substitute for hardware validation.
+The unsigned GitHub workflow builds and checks the apps. The release workflow signs watch/companion artifacts on version tags or manual dispatch; it needs the signing secrets configured by the maintainer. Optional full phone APKs can be enabled with the `full_phone` dispatch input.
 
 ## Preparing a GitHub release
 
@@ -124,4 +124,7 @@ App versions are set in `gradle/libs.versions.toml`. Release notes belong under 
 1. Complete the [maintainer release checklist](release-checklist.md) against the final minified build, and run the GitHub build workflow on the source being released.
 2. Configure `BASE_64_SIGNING_KEY`, `KEY_STORE_PASSWORD`, `ALIAS` and optional `KEY_PASSWORD` repository secrets. Use a retained production key; do not substitute a local debug key. Keep an independent, secure backup.
 3. Build signed artifacts with the workflow or helper. Confirm the tag/version/code, package and certificate in `release-manifest.json`. Keep all APKs from one build together.
-4. Attach the four APKs, `SHA256SUMS` and manifest to a GitHub **prerelease**, with release notes covering features, fixes and known issues for users. Link the exact source tag. The workflow only uploads Actions artifacts; it does not create or publish a GitHub release.
+4. A version-tag run creates an unpublished GitHub prerelease draft with the four APKs, `SHA256SUMS`, manifest and release notes. On manual dispatch, enable `create_draft` and run against the commit referenced by the existing version tag. The workflow independently checks all assets, signatures, source identity and native payloads before creating the draft. It refuses test-only or dirty-source builds and never overwrites an existing release or draft.
+5. Review the draft and publish it when the release checklist is complete. The workflow never publishes automatically.
+
+Run the network-free release-tool checks with `python3 -m unittest discover -s tests`. To verify a signed set independently, use `python3 verify_release.py build/release --version <version> --source-revision <commit> --build-tools <sdk-build-tools-directory>`.

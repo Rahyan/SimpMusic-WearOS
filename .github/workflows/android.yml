@@ -38,6 +38,13 @@ jobs:
         with:
           submodules: "recursive"
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check release tooling
+        run: python3 -m unittest discover -s tests
+
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:

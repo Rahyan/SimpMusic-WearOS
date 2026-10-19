@@ -6,16 +6,18 @@ Status for `0.3.0-beta.1` (version code 41), updated October 19, 2026.
 
 ## Build and tests
 
-- [x] Run the domain, common, scraper, watch, companion and full-phone Foss unit suites: 72 tests pass.
+- [x] Run the domain, common, scraper, watch, companion and full-phone Foss unit suites: 88 tests pass.
+- [x] Run the release-tool suite: 13 tests pass, including artifact integrity and draft-only creation.
 - [x] Compile both Foss and Full phone Kotlin variants.
 - [x] Build watch and companion debug APKs, instrumentation APKs and minified release APKs.
 - [x] Run watch and companion debug/release lint; review remaining warnings.
 - [x] Exercise the drawer, scrolling, rotary input and volume feedback in the emulator interaction fixture.
+- [x] Run the isolated watch emulator suite: eight tests pass, including idle service reconnect, offline playlist persistence/safety, drawer input and progress updates.
 - [ ] Run GitHub-hosted CI on the exact source revision being released.
 
 | App | Debug lint warnings | Release lint warnings |
 | --- | ---: | ---: |
-| Watch | 19 | 18 |
+| Watch | 24 | 23 |
 | Companion | 14 | 11 |
 
 There are no lint errors or fatal issues. Emulator input checks supplement the physical-device checks below.
@@ -41,6 +43,9 @@ Use minified APKs signed with the same key on the watch and phone.
 - [ ] Check real bezel volume steps, temporary volume feedback and rotary list scrolling.
 - [ ] Check the player and drawer on a smaller round display and with larger text.
 - [ ] Play, seek and change tracks in a fully downloaded queue with Wi-Fi and Bluetooth disabled.
+- [ ] Refresh a saved offline playlist while the app is closed. Check charging/network constraints and that newly downloaded tracks play with radios disabled.
+- [ ] Check optional playlist cleanup after successful and failed refreshes. Manual downloads, the pinned queue and currently queued music must remain available.
+- [ ] Change the global download policy and retry an older queue request; verify the newer policy is retained, including after relaunch.
 - [ ] Reconnect Bluetooth headphones, change audio output and recover from Wi-Fi/Bluetooth proxy transitions.
 - [ ] Start watch playback from the phone with the watch app cold or in the background. Confirm playback and its media session remain active.
 - [ ] Sign out, relaunch, sign back in and refresh the session on both devices.
