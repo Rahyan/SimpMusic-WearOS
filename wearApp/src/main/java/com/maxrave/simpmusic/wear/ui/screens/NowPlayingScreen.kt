@@ -27,6 +27,9 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material.icons.filled.Notes
+import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -568,20 +571,16 @@ fun NowPlayingScreen(
                                                         } else {
                                                             MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.66f)
                                                         },
-                                                    ).clickable { lyricsDisplayMode = mode }
-                                                    .padding(vertical = 6.dp),
+                                                    ).clickable(role = Role.Tab) { lyricsDisplayMode = mode }
+                                                    .semantics { this.selected = selected }.height(48.dp),
                                             contentAlignment = Alignment.Center,
                                         ) {
-                                            Text(
-                                                text = mode.label,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color =
-                                                    if (selected) {
-                                                        MaterialTheme.colorScheme.onPrimaryContainer
-                                                    } else {
-                                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                                    },
-                                            )
+                                            Icon(when (mode) {
+                                                WearLyricsDisplayMode.ORIGINAL -> Icons.Filled.Notes
+                                                WearLyricsDisplayMode.TRANSLATED -> Icons.Filled.Translate
+                                                WearLyricsDisplayMode.BOTH -> Icons.Filled.ViewAgenda
+                                            }, if (mode == WearLyricsDisplayMode.BOTH) "Original and translated lyrics"
+                                                else "${mode.label} lyrics", Modifier.size(24.dp), tint = Color.White)
                                         }
                                     }
                                 }
