@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
+import androidx.compose.material.icons.automirrored.rounded.VolumeDown
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -86,9 +88,9 @@ internal fun CompanionPlayer(state: WatchPlaybackSnapshot?, connected: Boolean, 
             Control(Icons.Rounded.SkipNext, "Next track", { command(Bridge.REMOTE_NEXT) }, Modifier.weight(1f), active && state?.canNext == true, height = 62)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Control(Icons.Rounded.VolumeDown, "Lower watch volume", { command(Bridge.REMOTE_VOLUME_DOWN) }, enabled = fresh && !busy)
+            Control(Icons.AutoMirrored.Rounded.VolumeDown, "Lower watch volume", { command(Bridge.REMOTE_VOLUME_DOWN) }, enabled = fresh && !busy)
             Action("Queue · ${state?.queueSize ?: 0}", Modifier.weight(1f), enabled = fresh, onClick = { showQueue = !showQueue })
-            Control(Icons.Rounded.VolumeUp, "Raise watch volume", { command(Bridge.REMOTE_VOLUME_UP) }, enabled = fresh && !busy)
+            Control(Icons.AutoMirrored.Rounded.VolumeUp, "Raise watch volume", { command(Bridge.REMOTE_VOLUME_UP) }, enabled = fresh && !busy)
         }
         if (connected && !fresh) Text("Waiting for a fresh player update. Controls will return when your watch responds.", color = Muted, fontSize = 12.sp)
         OfflineQueuePanel(state, fresh, busy, onAction)

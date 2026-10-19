@@ -1,10 +1,13 @@
 package com.maxrave.simpmusic.wear.ui.components
 
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -16,10 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.foundation.rotary.rotaryScrollable
 import androidx.wear.compose.material3.ScrollIndicator
+import androidx.wear.compose.material3.MaterialTheme
 
 @Composable
 fun WearList(
@@ -52,6 +57,12 @@ fun WearList(
             verticalArrangement = verticalArrangement,
             content = content,
         )
+
+        // Keep scrolled content from showing through the clock's reserved top inset.
+        val background = MaterialTheme.colorScheme.background
+        Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(34.dp).background(
+            Brush.verticalGradient(0f to background, .65f to background, 1f to background.copy(alpha = 0f)),
+        ))
 
         ScrollIndicator(
             state = state,
