@@ -108,8 +108,9 @@ fun PlayerDrawer(state: PlayerDrawerState, listState: LazyListState, color: Colo
             startDragImmediately = betweenAnchors,
             onDragStarted = { state.startDrag() },
             onDragStopped = { state.settle(scope, height, it, flingThreshold).join() })
-        Box(if (visible) Modifier.clearAndSetSemantics {} else Modifier) {
-            player(drag.graphicsLayer { alpha = 1f - state.fraction })
+        Box((if (visible) Modifier.clearAndSetSemantics {} else Modifier)
+            .graphicsLayer { alpha = 1f - state.fraction }) {
+            player(drag)
         }
         if (visible) {
             Box(Modifier.fillMaxSize().graphicsLayer { alpha = state.fraction * .25f }
