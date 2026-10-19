@@ -698,7 +698,10 @@ internal class MediaServiceHandlerImpl(
                     player.pause()
                     stopProgressUpdate()
                 } else {
-                    if (player.playbackState == PlayerConstants.STATE_IDLE && player.mediaItemCount > 0) player.prepare()
+                    when (player.playbackState) {
+                        PlayerConstants.STATE_IDLE -> player.prepare()
+                        PlayerConstants.STATE_ENDED -> player.seekTo(0)
+                    }
                     player.play()
                     startProgressUpdate()
                 }
