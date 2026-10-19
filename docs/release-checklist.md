@@ -6,7 +6,7 @@ Status for `0.3.0-beta.1` (version code 41), updated October 19, 2026.
 
 ## Build and tests
 
-- [x] Run the domain, common, scraper, watch, companion and full-phone Foss unit suites: 88 tests pass.
+- [x] Validate the domain, common, scraper, watch, companion and full-phone Foss unit suites: 94 regression cases. The affected scraper and watch suites pass all 42 tests; the final sheet changes also pass the watch suite.
 - [x] Run the release-tool suite: 13 tests pass, including artifact integrity and draft-only creation.
 - [x] Compile both Foss and Full phone Kotlin variants.
 - [x] Build watch and companion debug APKs, instrumentation APKs and minified release APKs.
@@ -38,21 +38,34 @@ There are no lint errors or fatal issues. Emulator input checks supplement the p
 
 Use minified APKs signed with the same key on the watch and phone.
 
-- [ ] Stream as a guest and with a signed-in account. Check seeking, buffering, retries and the transition at track completion.
-- [ ] Check drawer dragging in both directions, settling, Back, and scrolling lyrics/queue without accidental dismissal.
-- [ ] Check real bezel volume steps, temporary volume feedback and rotary list scrolling.
-- [ ] Check the player and drawer on a smaller round display and with larger text.
-- [ ] Play, seek and change tracks in a fully downloaded queue with Wi-Fi and Bluetooth disabled.
+Completed checks used an isolated minified build on a Galaxy Watch4 Classic (API 34, ARMv7) paired with a Galaxy S23 (API 34). Public APK signing and upload verification remain separate checks above.
+
+- [x] Search and stream as a guest, seek forward and continue to the next queued track without a playback error.
+- [ ] Repeat sustained streaming, buffering and retry checks with a signed-in account.
+- [x] Restart a finished finite queue with the normal watch and companion Play buttons.
+- [x] Check consecutive one-second updates on the watch and companion, including the companion slider.
+- [x] Check held drawer drags in both directions, settling, Back and tab changes on the watch.
+- [ ] Scroll long synced lyrics and long queues without accidental drawer dismissal.
+- [x] Confirm real bezel volume changes by one hardware step per click.
+- [ ] Check temporary volume feedback restoration and rotary list scrolling on hardware.
+- [x] Check the player and drawer with larger system text, including lyric display controls.
+- [ ] Check a smaller physical round display; emulator coverage supplements this check.
+- [x] Reopen a stopped downloaded queue and play after a late seek with Wi-Fi and Bluetooth disabled.
+- [ ] Select a fresh offline queue and change between multiple downloaded tracks with both radios disabled.
+- [x] Complete a real pinned-queue download requested from the phone while the watch UI is closed.
 - [ ] Refresh a saved offline playlist while the app is closed. Check charging/network constraints and that newly downloaded tracks play with radios disabled.
 - [ ] Check optional playlist cleanup after successful and failed refreshes. Manual downloads, the pinned queue and currently queued music must remain available.
 - [ ] Change the global download policy and retry an older queue request; verify the newer policy is retained, including after relaunch.
-- [ ] Reconnect Bluetooth headphones, change audio output and recover from Wi-Fi/Bluetooth proxy transitions.
-- [ ] Start watch playback from the phone with the watch app cold or in the background. Confirm playback and its media session remain active.
-- [ ] Sign out, relaunch, sign back in and refresh the session on both devices.
+- [ ] Optional: reconnect Bluetooth headphones and change audio output. Check recovery from Wi-Fi/Bluetooth proxy transitions.
+- [x] Start watch playback from the phone with the watch UI closed and confirm its media session remains active.
+- [ ] Repeat remote playback after the watch process has been reclaimed.
+- [x] Sign out on the watch, confirm Guest mode after relaunch, then restore the session from the companion with an applied acknowledgement.
+- [ ] Complete fresh Google sign-in and the full phone/watch sign-out and revoke flow.
 - [ ] Check stale remote commands, queue ordering and library synchronization with local watch changes.
 - [ ] Check restricted/unavailable media and useful error/retry behavior.
 - [ ] Measure cold start, player frame behavior and memory use.
-- [ ] For updates, install over the previous supported version with the same signing key and verify settings, library and downloads are preserved.
+- [x] Update the isolated test apps in place and retain their session and verified offline download.
+- [ ] Install over the previous publicly supported version with its retained signing key and verify settings, library and downloads.
 
 ## Publication
 
