@@ -1432,11 +1432,7 @@ class SharedViewModel(
 
     fun addListToQueue(listTrack: ArrayList<Track>) {
         viewModelScope.launch {
-            if (listTrack.size == 1 && dataStoreManager.endlessQueue.first() == TRUE) {
-                mediaPlayerHandler.playNext(listTrack.first())
-                makeToast(getString(R.string.play_next))
-            } else {
-                mediaPlayerHandler.loadMoreCatalog(listTrack)
+            if (mediaPlayerHandler.loadMoreCatalog(listTrack, isAddToQueue = true)) {
                 makeToast(getString(R.string.added_to_queue))
             }
         }

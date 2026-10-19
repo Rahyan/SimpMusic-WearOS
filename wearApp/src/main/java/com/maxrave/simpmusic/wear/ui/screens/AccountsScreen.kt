@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.material3.Icon
+import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
@@ -48,6 +49,7 @@ import com.maxrave.simpmusic.wear.ui.theme.nextAccentPreset
 import com.maxrave.simpmusic.wear.ui.theme.nextWearPlayerStyle
 import com.maxrave.simpmusic.wear.ui.theme.wearPlayerStyleLabel
 import com.maxrave.simpmusic.wear.ui.components.WearEmptyState
+import com.maxrave.simpmusic.wear.ui.components.WearScreenHeader
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -170,33 +172,12 @@ fun AccountsScreen(
     }
 
     WearList {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Settings",
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(
-                    onClick = {
-                        scope.launch {
-                            wearAccountManager.logOutAll()
-                            Toast.makeText(context, "Logged out", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    enabled = loggedIn || accounts.isNotEmpty(),
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = "Log out all")
-                }
-            }
+        item { WearScreenHeader("Settings", onBack = onBack) }
+        if (loggedIn || accounts.isNotEmpty()) item {
+            FilledTonalButton(onClick = { scope.launch {
+                wearAccountManager.logOutAll()
+                Toast.makeText(context, "Signed out", Toast.LENGTH_SHORT).show()
+            } }, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
         }
 
         item {
@@ -230,7 +211,7 @@ fun AccountsScreen(
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                     Text(
-                        text = "Request current phone login cookie",
+                        text = "Use your phone account on this watch",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f),
                         maxLines = 1,
@@ -684,7 +665,7 @@ private fun SettingToggleRow(
                     shape = RoundedCornerShape(16.dp),
                 ).border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
                     shape = RoundedCornerShape(16.dp),
                 )
                 .clickable(
@@ -747,7 +728,7 @@ private fun Modifier.settingCardModifier(): Modifier =
                 shape = RoundedCornerShape(16.dp),
             ).border(
                 width = 1.dp,
-                color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
                 shape = RoundedCornerShape(16.dp),
             ).padding(horizontal = 10.dp, vertical = 10.dp)
     }

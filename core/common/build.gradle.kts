@@ -37,6 +37,9 @@ android {
 
 dependencies {
     implementation(libs.napier.logging)
+    implementation(libs.coroutines.android)
+    testImplementation(libs.junit)
+    testImplementation(libs.org.json)
 }
 tasks.withType<CompileArtProfileTask> {
     enabled = false

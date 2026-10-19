@@ -1,10 +1,17 @@
 package com.maxrave.common
 
 object WearCompanionBridge {
+    const val REMOTE_PREPARE_OFFLINE = "prepare_offline_queue"
+    const val REMOTE_RETRY_OFFLINE = "retry_offline_queue"
+    const val REMOTE_PLAY_OFFLINE = "play_offline_queue"
     const val PATH_REQUEST = "/simpmusic/watch/companion/request"
     const val PATH_RESPONSE = "/simpmusic/watch/companion/response"
 
     const val ACTION_STATUS = "status"
+    const val PROTOCOL_VERSION = 2
+    const val ACTION_PLAYBACK_STATE = "playback_state"
+    const val ACTION_LOGOUT = "logout"
+    const val ACTION_RECONCILE = "reconcile"
     const val ACTION_SYNC_SESSION = "sync_session"
     const val ACTION_SYNC_SONG = "sync_song"
     const val ACTION_SYNC_PLAYLIST = "sync_playlist"
@@ -17,6 +24,10 @@ object WearCompanionBridge {
     const val REMOTE_PLAY_PAUSE = "play_pause"
     const val REMOTE_NEXT = "next"
     const val REMOTE_PREVIOUS = "previous"
+    const val REMOTE_SEEK = "seek"
+    const val REMOTE_QUEUE_PLAY = "queue_play"
+    const val REMOTE_QUEUE_REMOVE = "queue_remove"
+    const val REMOTE_QUEUE_MOVE = "queue_move"
     const val REMOTE_VOLUME_UP = "volume_up"
     const val REMOTE_VOLUME_DOWN = "volume_down"
     const val REMOTE_HANDOFF_QUEUE = "handoff_queue"
@@ -37,6 +48,7 @@ object WearCompanionBridge {
     const val KEY_AUTO_SYNC_SIG_PODCASTS = "watch_companion_sig_podcasts"
     const val KEY_AUTO_SYNC_SIG_DOWNLOADS = "watch_companion_sig_downloads"
 
+    const val KEY_WEAR_EXPLICIT_LOGOUT = "wear_explicit_logout"
     const val KEY_WEAR_BATTERY_SAVER_MODE = "wear_battery_saver_mode"
     const val KEY_WEAR_PHONE_OFFLOAD_CONTROLS = "wear_phone_offload_controls"
 }

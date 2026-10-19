@@ -168,7 +168,6 @@ class PoTokenWebView(
      */
     @JavascriptInterface
     fun onRunBotguardResult(botguardResponse: String) {
-        Logger.d(TAG, "botguardResponse: $botguardResponse")
 
         coroutineScope.launch {
             try {
@@ -202,7 +201,6 @@ class PoTokenWebView(
 
     //region Obtaining poTokens
     override suspend fun generatePoToken(identifier: String): String {
-        Logger.d(TAG, "generatePoToken() called with identifier $identifier")
 
         return withContext(Dispatchers.Main) {
             suspendCancellableCoroutine { continuation ->
@@ -254,7 +252,6 @@ class PoTokenWebView(
         identifier: String,
         poTokenU8: String,
     ) {
-        Logger.d(TAG, "Generated poToken (before decoding): identifier=$identifier poTokenU8=$poTokenU8")
         val poToken =
             try {
                 u8ToBase64(poTokenU8)
@@ -263,7 +260,6 @@ class PoTokenWebView(
                 return
             }
 
-        Logger.d(TAG, "Generated poToken: identifier=$identifier poToken=$poToken")
         popPoTokenContinuation(identifier)?.resume(poToken)
     }
 

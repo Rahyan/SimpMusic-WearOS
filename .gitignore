@@ -30,3 +30,14 @@ sentry.properties
 /.claude/
 /_codex/
 /Screenshot_*_dev.png
+
+# Local signing files, exported device data and Python helper caches.
+*.keystore
+*.jks
+*.p12
+*.pfx
+__pycache__/
+*.pyc
+*.apk
+*.aab
+*.apks

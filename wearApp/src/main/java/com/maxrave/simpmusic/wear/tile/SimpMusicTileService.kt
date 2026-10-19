@@ -98,16 +98,7 @@ class SimpMusicTileService : TileService() {
                 .addContent(
                     LayoutElementBuilders.Spacer.Builder().setHeight(DimensionBuilders.dp(8f)).build(),
                 ).addContent(
-                    LayoutElementBuilders.Text.Builder()
-                        .setText("Tap title to open app")
-                        .setFontStyle(
-                            LayoutElementBuilders.FontStyle.Builder()
-                                .setSize(DimensionBuilders.sp(11f))
-                                .setColor(ColorBuilders.argb(0xFFA2B6C0.toInt()))
-                                .build(),
-                        ).setMaxLines(1)
-                        .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
-                        .build(),
+                    buildControlButton("Offline queue", buildLaunchClickable("offline", ACTION_OFFLINE), 148f),
                 ).build()
 
         val root =
@@ -173,10 +164,11 @@ class SimpMusicTileService : TileService() {
     private fun buildControlButton(
         label: String,
         clickable: ModifiersBuilders.Clickable,
+        width: Float = 48f,
     ): LayoutElementBuilders.Box =
         LayoutElementBuilders.Box.Builder()
-            .setWidth(DimensionBuilders.dp(44f))
-            .setHeight(DimensionBuilders.dp(30f))
+            .setWidth(DimensionBuilders.dp(width))
+            .setHeight(DimensionBuilders.dp(40f))
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
             .setModifiers(
@@ -229,9 +221,10 @@ class SimpMusicTileService : TileService() {
         }
 
     companion object {
-        const val RESOURCES_VERSION = "1"
+        const val RESOURCES_VERSION = "2"
         const val EXTRA_TILE_ACTION = "tile_action"
         const val ACTION_OPEN = "open"
+        const val ACTION_OFFLINE = "offline_queue"
         const val ACTION_PLAY_PAUSE = "play_pause"
         const val ACTION_NEXT = "next"
         const val ACTION_PREVIOUS = "previous"

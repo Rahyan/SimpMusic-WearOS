@@ -882,8 +882,9 @@ class LocalPlaylistViewModel(
             showLoadingDialog(getString(R.string.add_to_queue))
             val fullTracks = localPlaylistRepository.getFullPlaylistTracks(id = uiState.value.id)
             if (fullTracks.isNotEmpty()) {
-                mediaPlayerHandler.loadMoreCatalog(fullTracks.toArrayListTrack(), true)
-                makeToast(getString(R.string.added_to_queue))
+                if (mediaPlayerHandler.loadMoreCatalog(fullTracks.toArrayListTrack(), true)) {
+                    makeToast(getString(R.string.added_to_queue))
+                }
                 hideLoadingDialog()
             } else {
                 makeToast(getString(R.string.playlist_is_empty))

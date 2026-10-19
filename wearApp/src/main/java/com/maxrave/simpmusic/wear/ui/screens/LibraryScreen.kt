@@ -55,6 +55,7 @@ import com.maxrave.domain.repository.SongRepository
 import com.maxrave.domain.utils.toTrack
 import com.maxrave.simpmusic.wear.ui.components.WearEmptyState
 import com.maxrave.simpmusic.wear.ui.components.QuickActionChip
+import com.maxrave.simpmusic.wear.ui.components.WearScreenHeader
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import com.maxrave.simpmusic.wear.ui.components.WearLoadingState
 import kotlinx.coroutines.launch
@@ -131,23 +132,7 @@ fun LibraryScreen(
     val downloadedTracks = downloadedSongs?.map { it.toTrack() } ?: cachedDownloadedTracks
 
     WearList(state = listState) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Library",
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
+        item { WearScreenHeader("Library", onBack = onBack) }
 
         item { Spacer(Modifier.height(6.dp)) }
 
@@ -354,7 +339,7 @@ private fun PlaylistRow(
                     shape = RoundedCornerShape(16.dp),
                 ).border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
                     shape = RoundedCornerShape(16.dp),
                 ).padding(horizontal = 10.dp, vertical = 10.dp),
     ) {

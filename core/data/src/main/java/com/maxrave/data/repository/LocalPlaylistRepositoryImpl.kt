@@ -38,6 +38,7 @@ import com.maxrave.kotlinytmusicscraper.models.SongItem
 import com.maxrave.kotlinytmusicscraper.models.response.SearchResponse
 import com.maxrave.kotlinytmusicscraper.pages.NextPage
 import com.maxrave.kotlinytmusicscraper.pages.SearchPage
+import com.maxrave.kotlinytmusicscraper.parser.playlistContinuationContents
 import com.maxrave.kotlinytmusicscraper.parser.getPlaylistContinuation
 import com.maxrave.logger.Logger
 import kotlinx.coroutines.Dispatchers
@@ -271,40 +272,19 @@ internal class LocalPlaylistRepositoryImpl(
                             ?.musicPlaylistShelfRenderer
                             ?.contents
                     data?.let { listContent.addAll(it) }
-                    var continueParam =
-                        res.contents
-                            ?.twoColumnBrowseResultsRenderer
-                            ?.secondaryContents
-                            ?.sectionListRenderer
-                            ?.continuations
-                            ?.firstOrNull()
-                            ?.nextContinuationData
-                            ?.continuation
-                    while (continueParam != null) {
-                        youTube
-                            .customQuery(
-                                "",
-                                continuation = continueParam,
-                                setLogin = true,
-                            ).onSuccess { values ->
-                                val dataMore: List<MusicShelfRenderer.Content>? =
-                                    values.continuationContents
-                                        ?.sectionListContinuation
-                                        ?.contents
-                                        ?.firstOrNull()
-                                        ?.musicShelfRenderer
-                                        ?.contents
-                                if (dataMore != null) {
-                                    listContent.addAll(dataMore)
-                                }
-                                continueParam =
-                                    values.continuationContents
-                                        ?.sectionListContinuation
-                                        ?.continuations
-                                        ?.firstOrNull()
-                                        ?.nextContinuationData
-                                        ?.continuation
-                            }.onFailure { continueParam = null }
+                    var continueParam = res.getPlaylistContinuation()
+                    val seenContinuations = mutableSetOf<String>()
+                    while (continueParam != null && seenContinuations.add(continueParam)) {
+                        val values = youTube.customQuery("", continuation = continueParam, setLogin = true).getOrElse {
+                            emit(LocalResource.Error("Playlist sync interrupted; retry to finish."))
+                            return@flow
+                        }
+                        listContent.addAll(values.playlistContinuationContents().orEmpty())
+                        continueParam = values.getPlaylistContinuation()
+                    }
+                    if (continueParam != null) {
+                        emit(LocalResource.Error("Playlist continuation repeated; retry to finish."))
+                        return@flow
                     }
                     if (listContent.isEmpty()) {
                         emit(LocalResource.Error("Can't get setVideoId"))
@@ -497,6 +477,7 @@ internal class LocalPlaylistRepositoryImpl(
                                     SetVideoIdEntity(
                                         d.playlistEditVideoAddedResultData.videoId,
                                         d.playlistEditVideoAddedResultData.setVideoId,
+                                        ytId.removePrefix("VL"),
                                     ),
                                 )
                             }
@@ -524,11 +505,13 @@ internal class LocalPlaylistRepositoryImpl(
             emit(LocalResource.Success(getString(R.string.delete_song_from_playlist)))
             val ytPlaylistId = localPlaylist.youtubePlaylistId
             if (ytPlaylistId != null) {
-                val setVideoId = localDataSource.getSetVideoId(song.videoId)?.setVideoId
+                val entry = localDataSource.getSetVideoId(song.videoId, ytPlaylistId)
+                val setVideoId = entry?.setVideoId
                 if (setVideoId != null) {
                     youTube
                         .removeItemYouTubePlaylist(ytPlaylistId, song.videoId, setVideoId)
                         .onSuccess {
+                            if (!entry?.youtubePlaylistId.isNullOrEmpty()) localDataSource.deleteSetVideoId(song.videoId, entry!!.youtubePlaylistId)
                             emit(LocalResource.Success(getString(R.string.removed_from_YouTube_playlist)))
                         }.onFailure {
                             emit(LocalResource.Error<String>("${getString(R.string.can_t_delete_from_youtube_playlist)}: ${it.message}"))
@@ -612,92 +595,10 @@ internal class LocalPlaylistRepositoryImpl(
 
     override fun getYouTubeSetVideoId(youtubePlaylistId: String): Flow<List<SetVideoIdEntity>> =
         flow {
-            runCatching {
-                var id = ""
-                if (!youtubePlaylistId.startsWith("VL")) {
-                    id += "VL$youtubePlaylistId"
-                } else {
-                    id += youtubePlaylistId
-                }
-                Logger.d("Repository", "playlist id: $id")
-                youTube
-                    .customQuery(browseId = id, setLogin = true)
-                    .onSuccess { result ->
-                        val listContent: ArrayList<SongItem> = arrayListOf()
-                        val data: List<MusicShelfRenderer.Content>? =
-                            result.contents
-                                ?.singleColumnBrowseResultsRenderer
-                                ?.tabs
-                                ?.get(
-                                    0,
-                                )?.tabRenderer
-                                ?.content
-                                ?.sectionListRenderer
-                                ?.contents
-                                ?.get(
-                                    0,
-                                )?.musicPlaylistShelfRenderer
-                                ?.contents
-                        var continueParam =
-                            result.getPlaylistContinuation()
-                        var count = 0
-                        Logger.d("Repository", "playlist data: ${listContent.size}")
-                        Logger.d("Repository", "continueParam: $continueParam")
-                        while (continueParam != null) {
-                            youTube
-                                .customQuery(
-                                    browseId = "",
-                                    continuation = continueParam,
-                                    setLogin = true,
-                                ).onSuccess { values ->
-                                    Logger.d("getPlaylistData", "continue: $continueParam")
-                                    Logger.d(
-                                        "getPlaylistData",
-                                        "values: ${values.onResponseReceivedActions}",
-                                    )
-                                    val dataMore: List<SongItem> =
-                                        values.onResponseReceivedActions
-                                            ?.firstOrNull()
-                                            ?.appendContinuationItemsAction
-                                            ?.continuationItems
-                                            ?.apply {
-                                                Logger.w("getPlaylistData", "dataMore: ${this.size}")
-                                            }?.mapNotNull {
-                                                NextPage.fromMusicResponsiveListItemRenderer(
-                                                    it.musicResponsiveListItemRenderer ?: return@mapNotNull null,
-                                                )
-                                            } ?: emptyList()
-                                    listContent.addAll(dataMore)
-                                    continueParam =
-                                        values.getPlaylistContinuation()
-                                    count++
-                                }.onFailure {
-                                    Logger.e("Continue", "Error: ${it.message}")
-                                    continueParam = null
-                                    count++
-                                }
-                        }
-                        Logger.d("Repository", "playlist final data: ${listContent.size}")
-                        parseSetVideoId(youtubePlaylistId, data ?: emptyList()).let { playlist ->
-                            playlist.forEach { item ->
-                                localDataSource.insertSetVideoId(item)
-                            }
-                            listContent.forEach { item ->
-                                localDataSource.insertSetVideoId(
-                                    SetVideoIdEntity(
-                                        videoId = item.id,
-                                        setVideoId = item.setVideoId,
-                                        youtubePlaylistId = youtubePlaylistId,
-                                    ),
-                                )
-                            }
-                            emit(playlist)
-                        }
-                    }.onFailure { e ->
-                        e.printStackTrace()
-                        emit(emptyList())
-                    }
-            }
+            val entries = youTube.getYouTubePlaylistFullTracksWithSetVideoId(youtubePlaylistId).getOrElse { throw it }
+                .map { (song, entry) -> SetVideoIdEntity(song.id, entry, youtubePlaylistId.removePrefix("VL")) }
+            entries.forEach { localDataSource.insertSetVideoId(it) }
+            emit(entries)
         }.flowOn(Dispatchers.IO)
 
     override fun addYouTubePlaylistItem(
@@ -715,6 +616,7 @@ internal class LocalPlaylistRepositoryImpl(
                                 SetVideoIdEntity(
                                     playlistEditResult.playlistEditVideoAddedResultData.videoId,
                                     playlistEditResult.playlistEditVideoAddedResultData.setVideoId,
+                                    youtubePlaylistId.removePrefix("VL"),
                                 ),
                             )
                         }

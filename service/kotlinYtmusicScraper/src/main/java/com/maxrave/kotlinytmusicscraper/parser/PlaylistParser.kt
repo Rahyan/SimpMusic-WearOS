@@ -66,43 +66,26 @@ fun BrowseResponse.fromPlaylistToTrackWithSetVideoId(): List<Pair<SongItem, Stri
         )
     } ?: emptyList()
 
+/** Both current action-based responses and legacy shelf continuations. */
+fun BrowseResponse.playlistContinuationContents(): List<MusicShelfRenderer.Content>? =
+    onResponseReceivedActions?.firstNotNullOfOrNull { it.appendContinuationItemsAction }
+        ?.continuationItems?.map { MusicShelfRenderer.Content(it.musicResponsiveListItemRenderer, null, it.continuationItemRenderer) }
+        ?: continuationContents?.musicPlaylistShelfContinuation?.contents
+        ?: continuationContents?.sectionListContinuation?.contents?.firstOrNull()?.musicShelfRenderer?.contents
+
 fun BrowseResponse.fromPlaylistContinuationToTracks(): List<SongItem> =
-    (
-        this.continuationContents
-            ?.musicPlaylistShelfContinuation
-            ?.contents
-            ?: this.continuationContents
-                ?.sectionListContinuation
-                ?.contents
-                ?.firstOrNull()
-                ?.musicShelfRenderer
-                ?.contents
-    )?.mapNotNull { contents ->
-        contents.toSongItem()
-    } ?: emptyList()
+    playlistContinuationContents()?.mapNotNull { it.toSongItem() }.orEmpty()
 
 fun BrowseResponse.fromPlaylistContinuationToTrackWithSetVideoId(): List<Pair<SongItem, String>> =
-    (
-        this.continuationContents
-            ?.musicPlaylistShelfContinuation
-            ?.contents
-            ?: this.continuationContents
-                ?.sectionListContinuation
-                ?.contents
-                ?.firstOrNull()
-                ?.musicShelfRenderer
-                ?.contents
-    )?.mapNotNull { contents ->
-        Pair(
-            contents.toSongItem() ?: return@mapNotNull null,
-            contents.toPlaylistItemData()?.playlistSetVideoId ?: return@mapNotNull null,
-        )
-    } ?: emptyList()
+    playlistContinuationContents()?.mapNotNull { content ->
+        val song = content.toSongItem() ?: return@mapNotNull null
+        val entry = content.toPlaylistItemData()?.playlistSetVideoId ?: return@mapNotNull null
+        song to entry
+    }.orEmpty()
 
 fun BrowseResponse.getPlaylistContinuation(): String? =
     this.onResponseReceivedActions
-        ?.firstOrNull()
-        ?.appendContinuationItemsAction
+        ?.firstNotNullOfOrNull { it.appendContinuationItemsAction }
         ?.continuationItems
         ?.lastOrNull()
         ?.continuationItemRenderer
@@ -179,6 +162,7 @@ fun BrowseResponse.getPlaylistContinuation(): String? =
             ?.musicPlaylistShelfContinuation
             ?.continuations
             ?.getContinuation()
+        ?: this.continuationContents?.sectionListContinuation?.continuations?.getContinuation()
 
 fun BrowseResponse.getContinuePlaylistContinuation(): String? =
     this.continuationContents

@@ -25,6 +25,14 @@ import java.time.LocalDateTime
 internal class LocalDataSource(
     private val databaseDao: DatabaseDao,
 ) {
+    suspend fun updateSongMetadata(item: SongEntity) = databaseDao.updateSongMetadata(item.bridgeMetadata())
+
+    suspend fun updateAlbumMetadata(item: AlbumEntity) = databaseDao.updateAlbumMetadata(item.bridgeMetadata())
+
+    suspend fun updateArtistMetadata(item: ArtistEntity) = databaseDao.updateArtistMetadata(item.bridgeMetadata())
+
+    suspend fun updatePodcastMetadata(item: PodcastsEntity) = databaseDao.upsertPodcastMetadata(item)
+
     fun checkpoint() = databaseDao.checkpoint()
 
     suspend fun getAllRecentData() = databaseDao.getAllRecentData()
@@ -324,7 +332,13 @@ internal class LocalDataSource(
 
     suspend fun insertSetVideoId(setVideoIdEntity: SetVideoIdEntity) = databaseDao.insertSetVideoId(setVideoIdEntity)
 
-    suspend fun getSetVideoId(videoId: String) = databaseDao.getSetVideoId(videoId)
+    suspend fun getSetVideoId(videoId: String, playlistId: String): SetVideoIdEntity? {
+        val bareId = playlistId.removePrefix("VL")
+        return databaseDao.getSetVideoId(videoId, listOf(bareId, "VL$bareId"))
+            ?: databaseDao.getSetVideoId(videoId, listOf(""))
+    }
+
+    suspend fun deleteSetVideoId(videoId: String, playlistId: String) = databaseDao.deleteSetVideoId(videoId, playlistId)
 
     suspend fun insertPairSongLocalPlaylist(pairSongLocalPlaylist: PairSongLocalPlaylist) =
         databaseDao.insertPairSongLocalPlaylist(pairSongLocalPlaylist)
@@ -477,17 +491,9 @@ internal class LocalDataSource(
         podcastId: String,
         isFavorite: Boolean,
     ): Boolean {
-        val podcast = databaseDao.getPodcast(podcastId)
-        if (podcast != null) {
-            val updatedPodcast =
-                podcast.copy(
-                    isFavorite = isFavorite,
-                    favoriteTime = if (isFavorite) LocalDateTime.now() else null,
-                )
-            return databaseDao.insertPodcast(updatedPodcast) > 0
-        } else {
-            return false
-        }
+        val changed = databaseDao.updatePodcastFavorite(podcastId, isFavorite,
+            if (isFavorite) LocalDateTime.now() else null)
+        return changed > 0 || databaseDao.getPodcast(podcastId)?.isFavorite == isFavorite
     }
 
     suspend fun getPodcastEpisodes(

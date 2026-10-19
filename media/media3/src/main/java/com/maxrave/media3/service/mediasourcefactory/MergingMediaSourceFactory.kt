@@ -1,5 +1,10 @@
 package com.maxrave.media3.service.mediasourcefactory
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import androidx.media3.datasource.cache.Cache
+import androidx.media3.datasource.cache.ContentMetadata
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
@@ -18,6 +23,8 @@ import kotlinx.coroutines.runBlocking
 internal class MergingMediaSourceFactory(
     private val defaultMediaSourceFactory: DefaultMediaSourceFactory,
     private val dataStoreManager: DataStoreManager,
+    private val context: Context,
+    private val downloadCache: Cache,
 ) : MediaSource.Factory {
     override fun setDrmSessionManagerProvider(drmSessionManagerProvider: DrmSessionManagerProvider): MediaSource.Factory {
         defaultMediaSourceFactory.setDrmSessionManagerProvider(drmSessionManagerProvider)
@@ -35,7 +42,7 @@ internal class MergingMediaSourceFactory(
         Logger.w("Merging Media Source", mediaItem.mediaMetadata.description.toString())
         val getVideo = runBlocking(Dispatchers.IO) { dataStoreManager.watchVideoInsteadOfPlayingAudio.first() } == DataStoreManager.Values.TRUE
         Logger.w("Merging Media Source", getVideo.toString())
-        if (mediaItem.mediaMetadata.description == MERGING_DATA_TYPE.VIDEO && getVideo) {
+        if (mediaItem.mediaMetadata.description == MERGING_DATA_TYPE.VIDEO && getVideo && !isVideoUnreachable(mediaItem.mediaId)) {
             val videoItem =
                 mediaItem
                     .buildUpon()
@@ -51,5 +58,16 @@ internal class MergingMediaSourceFactory(
         }
 
 //        val default = defaultMediaSourceFactory.createMediaSource(mediaItem.buildUpon().setMediaId("AUDIO-${mediaItem.mediaId}").build())
+    }
+    private fun isFullyCached(key: String): Boolean {
+        val length = ContentMetadata.getContentLength(downloadCache.getContentMetadata(key))
+        return length > 0 && downloadCache.isCached(key, 0, length)
+    }
+
+    private fun isVideoUnreachable(mediaId: String): Boolean {
+        if (!isFullyCached(mediaId) || isFullyCached("${MERGING_DATA_TYPE.VIDEO}$mediaId")) return false
+        val manager = context.getSystemService(ConnectivityManager::class.java) ?: return true
+        val network = manager.activeNetwork ?: return true
+        return manager.getNetworkCapabilities(network)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) != true
     }
 }

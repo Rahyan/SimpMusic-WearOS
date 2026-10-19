@@ -22,50 +22,31 @@ dependencyResolutionManagement {
     }
 }
 
-// prepare for git submodules
-val mediaServiceCore =
-    if (File(rootDir, "../MediaServiceCore").exists()) {
-        File(rootDir, "../MediaServiceCore")
-    } else {
-        File(rootDir, "./MediaServiceCore")
-    }
+// Prefer this checkout. A neighboring workspace must never silently replace checked-in code.
+fun moduleRoot(name: String): File {
+    val local = File(rootDir, name)
+    if (local.isDirectory) return local
+    val sibling = File(rootDir, "../$name")
+    require(sibling.isDirectory) { "Missing $name. Clone with --recurse-submodules or run git submodule update --init --recursive." }
+    return sibling
+}
 
-val sharedDir =
-    if (File(rootDir, "../MediaServiceCore/SharedModules").exists()) {
-        File(rootDir, "../MediaServiceCore/SharedModules")
-    } else {
-        File(rootDir, "./MediaServiceCore/SharedModules")
-    }
-
-val coreDir =
-    if (File(rootDir, "../core").exists()) {
-        File(rootDir, "../core")
-    } else {
-        File(rootDir, "./core")
-    }
-
-val serviceDir =
-    if (File(rootDir, "../service").exists()) {
-        File(rootDir, "../service")
-    } else {
-        File(rootDir, "./service")
-    }
-
-val mediaDir =
-    if (File(rootDir, "../media").exists()) {
-        File(rootDir, "../media")
-    } else {
-        File(rootDir, "./media")
-    }
+val mediaServiceCore = moduleRoot("MediaServiceCore")
+val sharedDir = File(mediaServiceCore, "SharedModules")
+val coreDir = moduleRoot("core")
+val serviceDir = moduleRoot("service")
+val mediaDir = moduleRoot("media")
 
 rootProject.name = "SimpMusic"
 include(
     "app",
+    "companionApp",
     "wearApp",
     ":common",
     ":data",
     ":domain",
     ":kotlinYtmusicScraper",
+    ":nativeMedia",
     ":spotify",
     ":aiService",
     ":lyricsService",
@@ -94,6 +75,7 @@ project(":domain").projectDir = File(coreDir, "domain")
 project(":aiService").projectDir = File(serviceDir, "aiService")
 project(":lyricsService").projectDir = File(serviceDir, "lyricsService")
 project(":kotlinYtmusicScraper").projectDir = File(serviceDir, "kotlinYtmusicScraper")
+project(":nativeMedia").projectDir = File(serviceDir, "nativeMedia")
 project(":spotify").projectDir = File(serviceDir, "spotify")
 
 // media modules

@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.Flow
 import java.time.LocalDateTime
 
 interface SongRepository {
+    suspend fun updateSongMetadata(item: SongEntity)
+
     fun getAllSongs(limit: Int): Flow<List<SongEntity>>
 
     suspend fun setInLibrary(

@@ -1,0 +1,7 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <application>
+        <service android:name="com.maxrave.media3.service.SimpleMediaService" tools:node="remove" />
+        <service android:name="com.maxrave.media3.service.download.MusicDownloadService" tools:node="remove" />
+        <receiver android:name="androidx.media3.session.MediaButtonReceiver" tools:node="remove" />
+    </application>
+</manifest>

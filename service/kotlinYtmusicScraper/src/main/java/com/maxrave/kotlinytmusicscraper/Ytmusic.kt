@@ -1,5 +1,7 @@
 package com.maxrave.kotlinytmusicscraper
 
+import com.maxrave.kotlinytmusicscraper.utils.sapisidFromCookieHeader
+
 import com.maxrave.kotlinytmusicscraper.encoder.brotli
 import com.maxrave.kotlinytmusicscraper.models.Context
 import com.maxrave.kotlinytmusicscraper.models.WatchEndpoint
@@ -23,9 +25,6 @@ import com.maxrave.kotlinytmusicscraper.models.ytdlp.YtdlpVideoInfo
 import com.maxrave.kotlinytmusicscraper.utils.parseCookieString
 import com.maxrave.kotlinytmusicscraper.utils.sha1
 import com.maxrave.logger.Logger
-import com.yausername.youtubedl_android.YoutubeDL
-import com.yausername.youtubedl_android.YoutubeDLException
-import com.yausername.youtubedl_android.YoutubeDLRequest
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.compression.ContentEncoding
@@ -91,45 +90,40 @@ class Ytmusic(
         context.packageManager?.hasSystemFeature(PackageManager.FEATURE_WATCH) == true
     }
 
-    private val ytDlp =
-        try {
-            // youtubedl-android is heavy and frequently broken on WearOS (missing native assets).
-            // Skipping it on watches improves startup time and avoids noisy stacktraces.
-            if (isWatchDevice) {
-                null
-            } else {
-                YoutubeDL.getInstance().init(context)
-                YoutubeDL.getInstance()
-            }
-        } catch (e: YoutubeDLException) {
-            Logger.e(TAG, "failed to initialize youtubedl-android", e)
-            null
-        }
-
     val normalJson =
         Json {
             ignoreUnknownKeys = true
             explicitNulls = false
             encodeDefaults = true
         }
-    private var httpClient = createClient()
+    private val clientLock = Any()
+    @Volatile private var activeClient: HttpClient? = null
+    private val httpClient: HttpClient
+        get() = activeClient ?: synchronized(clientLock) {
+            activeClient ?: createClient().also { activeClient = it }
+        }
+
+    // DI sets cache/proxy configuration before the first request. Do not construct several
+    // unused Ktor clients on the UI thread; initialize once when networking actually starts.
+    private fun invalidateClient() = synchronized(clientLock) {
+        activeClient?.close()
+        activeClient = null
+    }
 
     var cacheControlInterceptor: Interceptor? = null
         set(value) {
             field = value
-            httpClient.close()
-            httpClient = createClient()
+            invalidateClient()
         }
     var forceCacheInterceptor: Interceptor? = null
         set(value) {
             field = value
-            httpClient.close()
-            httpClient = createClient()
+            invalidateClient()
         }
     var cachePath: File? = null
         set(value) {
             field = value
-            httpClient = createClient()
+            invalidateClient()
         }
 
     var cookiePath: Path? = null
@@ -155,18 +149,13 @@ class Ytmusic(
     var proxy: Proxy? = null
         set(value) {
             field = value
-            httpClient.close()
-            httpClient = createClient()
+            invalidateClient()
         }
 
     internal fun updateYtdlp() {
-        // On some devices (notably WearOS) youtubedl-android fails to initialize due to missing
-        // native assets. Avoid throwing when update is attempted from shared init code.
-        if (ytDlp == null) return
-        runCatching {
-            YoutubeDL.getInstance().updateYoutubeDL(context)
-        }.onFailure {
-            Logger.e(TAG, "failed to update youtubedl-android", it)
+        if (isWatchDevice) return
+        runCatching { NativeMediaTools.engine?.update() }.onFailure {
+            Logger.w(TAG, "Optional phone extractor update unavailable.")
         }
     }
 
@@ -199,8 +188,8 @@ class Ytmusic(
             install(Logging) {
                 logger = io.ktor.client.plugins.logging.Logger.DEFAULT
                 // LogLevel.ALL is extremely noisy and can noticeably degrade performance on WearOS.
-                // Keep logs minimal there; on phones, keep the current verbosity.
-                level = if (isWatchDevice) LogLevel.NONE else LogLevel.ALL
+                // Request headers/bodies contain credentials and signed URLs; use explicit status logs instead.
+                level = LogLevel.NONE
             }
             install(ContentNegotiation) {
                 protobuf()
@@ -241,17 +230,18 @@ class Ytmusic(
         setLogin: Boolean = false,
         isUsingReferer: Boolean = true,
         customCookie: String? = null,
+        origin: String = "https://music.youtube.com",
     ) {
         contentType(ContentType.Application.Json)
         headers {
             append("X-Goog-Api-Format-Version", "1")
             append("X-YouTube-Client-Name", "${client.xClientName ?: 1}")
             append("X-YouTube-Client-Version", client.clientVersion)
-            pageId?.let {
+            pageId?.takeIf { setLogin }?.let {
                 append("X-Goog-Authuser", "0")
                 append("X-Goog-Pageid", it)
             }
-            append("x-origin", "https://music.youtube.com")
+            append("x-origin", origin)
             if (client.referer != null && isUsingReferer) {
                 append("Referer", client.referer)
             }
@@ -259,11 +249,9 @@ class Ytmusic(
                 val cookie = customCookie ?: this@Ytmusic.cookie
                 cookie?.let { cookie ->
                     append("Cookie", cookie)
-                    if ("SAPISID" !in cookieMap || "__Secure-3PAPISID" !in cookieMap) return@let
+                    val sapisidCookie = sapisidFromCookieHeader(cookie) ?: return@let
                     val currentTime = System.currentTimeMillis() / 1000
-                    val sapisidCookie = cookieMap["SAPISID"] ?: cookieMap["__Secure-3PAPISID"]
-                    val sapisidHash = sha1("$currentTime $sapisidCookie https://music.youtube.com")
-                    Logger.d(TAG, "SAPI SID Hash: SAPISIDHASH ${currentTime}_$sapisidHash")
+                    val sapisidHash = sha1("$currentTime $sapisidCookie $origin")
                     append("Authorization", "SAPISIDHASH ${currentTime}_$sapisidHash")
                 }
             }
@@ -274,11 +262,9 @@ class Ytmusic(
 
     internal fun getAuthorizationHeader(): String? =
         cookie?.let { cookie ->
-            if ("SAPISID" !in cookieMap || "__Secure-3PAPISID" !in cookieMap) null
+            val sapisidCookie = sapisidFromCookieHeader(cookie) ?: return@let null
             val currentTime = System.currentTimeMillis() / 1000
-            val sapisidCookie = cookieMap["SAPISID"] ?: cookieMap["__Secure-3PAPISID"]
             val sapisidHash = sha1("$currentTime $sapisidCookie https://music.youtube.com")
-            Logger.d(TAG, "SAPI SID Hash: SAPISIDHASH ${currentTime}_$sapisidHash")
             "SAPISIDHASH ${currentTime}_$sapisidHash"
         }
 
@@ -428,20 +414,10 @@ class Ytmusic(
         json: Json,
     ): YtdlpVideoInfo? =
         withContext(Dispatchers.IO) {
-            Logger.d(TAG, "ytdlpGetStreamUrl: videoId: $videoId, poToken: $poToken, clientName: $clientName")
-            val ytRequest = YoutubeDLRequest("https://music.youtube.com/watch?v=$videoId")
-            if (!cookie.isNullOrEmpty()) {
-                ytRequest.addOption("--cookies", cookiePath?.toString() ?: "")
-            }
-            ytRequest.addOption(
-                "--extractor-args",
-                "youtube:player_client=$clientName;youtube:webpage_skip" +
-                    if (clientName.contains("web") && poToken != null) ";youtube:po_token=$clientName.gvs+$poToken;" else "",
-            )
-            ytRequest.addOption("--dump-json")
-            val result = ytDlp?.execute(ytRequest)
-            val data = result?.out?.let { json.decodeFromString<YtdlpVideoInfo>(it) }
-            return@withContext data
+            Logger.d(TAG, "ytdlpGetStreamUrl: videoId=$videoId client=$clientName")
+            if (isWatchDevice) return@withContext null
+            NativeMediaTools.engine?.extract(videoId,
+                cookiePath?.toString()?.takeIf { !cookie.isNullOrEmpty() }, clientName, poToken, json)
         }
 
     suspend fun player(
@@ -451,13 +427,17 @@ class Ytmusic(
         cpn: String?,
         poToken: String? = null,
         signatureTimestamp: Int? = null,
-    ) = httpClient.post("player") {
-        ytClient(client, setLogin = true)
+    ) = httpClient.post(if (client.clientName in setOf("VISIONOS", "TVHTML5", "WEB_EMBEDDED_PLAYER"))
+        "https://www.youtube.com/youtubei/v1/player" else "player") {
+        // VISIONOS does not support account cookies; browsing still uses the signed-in session.
+        ytClient(client, setLogin = client.clientName != "VISIONOS", origin =
+            if (client.clientName in setOf("VISIONOS", "TVHTML5", "WEB_EMBEDDED_PLAYER"))
+                "https://www.youtube.com" else "https://music.youtube.com")
         setBody(
             PlayerBody(
                 context =
                     client.toContext(locale, visitorData).let {
-                        if (client == TVHTML5) {
+                        if (client.clientName == "WEB_EMBEDDED_PLAYER") {
                             it.copy(
                                 thirdParty =
                                     Context.ThirdParty(
@@ -860,78 +840,9 @@ class Ytmusic(
             )
         }
 
-    fun download(
-        url: String,
-        pathString: String,
-    ): Flow<Triple<Boolean, Float, Int>> =
-        // Boolean is for isDone
-        channelFlow {
-            val fileSystem = FileSystem.SYSTEM
-            val path = pathString.toPath()
-            with(httpClient) {
-                val isExist = fileSystem.exists(path)
-                if (isExist) {
-                    try {
-                        fileSystem.delete(path)
-                    } catch (e: IOException) {
-                        e.printStackTrace()
-                    }
-                }
-                val length = head(url).headers[HttpHeaders.ContentLength]?.toLong() ?: 0
-                var downloadedBytes = 0L
-                var jobDone = 0
-                coroutineScope {
-                    val downloadJob =
-                        launch {
-                            runCatching {
-                                prepareRequest {
-                                    url(url)
-                                }.execute { res ->
-                                    val channel = res.bodyAsChannel()
-                                    fileSystem.appendingSink(path).buffer().use { sink ->
-                                        while (!channel.isClosedForRead) {
-                                            val packet = channel.readRemaining(DEFAULT_BUFFER_SIZE.toLong())
-                                            while (!packet.exhausted()) {
-                                                val bytes = packet.readByteArray()
-                                                sink.write(bytes)
-                                                downloadedBytes += bytes.size
-                                            }
-                                        }
-                                    }
-                                }
-                            }.onSuccess {
-                                Logger.d(TAG, "Downloaded $downloadedBytes bytes")
-                                jobDone = 1
-                            }.onFailure { e ->
-                                e.printStackTrace()
-                                jobDone = 1
-                            }
-                        }
-                    val emitJob =
-                        launch {
-                            var seconds = 0f
-                            while (jobDone < 1 && downloadedBytes < length) {
-                                delay(100)
-                                seconds += 0.1f
-                                val progress = downloadedBytes.toFloat() / length
-                                val speed = (downloadedBytes / seconds / 1024).toInt()
-                                Logger.d(TAG, "Downloaded: $progress")
-                                Logger.d(TAG, "Speed: $speed KB/s")
-                                trySend(Triple(false, progress, speed))
-                                    .onFailure { e ->
-                                        e?.printStackTrace()
-                                    }
-                            }
-                        }
-                    downloadJob.join()
-                    emitJob.join()
-                }
-                Logger.d(TAG, "Downloaded $downloadedBytes bytes")
-                Logger.d(TAG, "Merged $pathString")
-                trySend(Triple(true, 1f, 0)).onFailure { e ->
-                    e?.printStackTrace()
-                }
-            }
+    fun download(url: String, pathString: String, expectedLength: Long? = null): Flow<Triple<Boolean, Float, Int>> =
+        com.maxrave.kotlinytmusicscraper.utils.downloadFile(httpClient, url, pathString, expectedLength) {
+            Logger.e(TAG, "Download failed", it)
         }
 
     suspend fun is403Url(url: String): Boolean {

@@ -5,6 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.wear.compose.material3.Icon
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,11 +27,11 @@ fun WearLoadingState(message: String) {
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 2.dp)
-                .padding(vertical = 2.dp),
+                .padding(vertical = 16.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        CircularProgressIndicator()
+        CircularProgressIndicator(modifier = Modifier.size(28.dp))
         Spacer(Modifier.height(8.dp))
         Text(
             text = message,
@@ -47,8 +51,11 @@ fun WearEmptyState(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 2.dp),
+                .padding(horizontal = 6.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        Icon(Icons.Filled.MusicNote, null, tint = MaterialTheme.colorScheme.primary.copy(alpha = .65f), modifier = Modifier.size(28.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
             text = title,
             style = MaterialTheme.typography.bodyMedium,

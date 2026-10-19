@@ -15,10 +15,17 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
+    <queries>
+        <intent><action android:name="com.android.settings.panel.action.MEDIA_OUTPUT" /></intent>
+    </queries>
+
     <application
         android:name="com.maxrave.simpmusic.wear.WearSimpMusicApplication"
-        android:allowBackup="true"
-        android:icon="@android:drawable/sym_def_app_icon"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:icon="@mipmap/ic_wear"
+        android:roundIcon="@mipmap/ic_wear"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.SimpMusicWear">
@@ -29,6 +36,7 @@
 
         <activity
             android:name="com.maxrave.simpmusic.wear.WearMainActivity"
+            android:taskAffinity="${applicationId}.wear"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -40,9 +48,8 @@
             android:name="com.maxrave.simpmusic.wear.wearable.WearDataLayerListenerService"
             android:exported="true">
             <intent-filter>
-                <action
-                    android:name="com.google.android.gms.wearable.BIND_LISTENER"
-                    tools:ignore="WearableBindListener" />
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/simpmusic/" />
             </intent-filter>
         </service>
 

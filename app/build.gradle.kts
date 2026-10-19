@@ -2,7 +2,9 @@
 import com.android.build.gradle.internal.tasks.CompileArtProfileTask
 import java.util.Properties
 
-val isFullBuild: Boolean by rootProject.extra
+val localBuildProperties = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
+}
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -13,7 +15,7 @@ plugins {
 }
 
 kotlin {
-    jvmToolchain(21) // or appropriate version
+    jvmToolchain(21)
     compilerOptions {
         freeCompilerArgs.add("-Xwhen-guards")
         freeCompilerArgs.add("-Xcontext-parameters")
@@ -81,24 +83,8 @@ android {
             abiFilters.add("arm64-v8a")
         }
 
-        if (isFullBuild) {
-            try {
-                println("Full build detected, enabling Sentry DSN")
-                val properties = Properties()
-                properties.load(rootProject.file("local.properties").inputStream())
-                buildConfigField(
-                    "String",
-                    "SENTRY_DSN",
-                    "\"${properties.getProperty("SENTRY_DSN") ?: ""}\"",
-                )
-            } catch (e: Exception) {
-                println("Failed to load SENTRY_DSN from local.properties: ${e.message}")
-                buildConfigField("String", "SENTRY_DSN", "\"\"")
-            }
-        } else {
-            // Ensure BuildConfig.SENTRY_DSN is always present (some sources reference it unconditionally).
-            buildConfigField("String", "SENTRY_DSN", "\"\"")
-        }
+        buildConfigField("String", "SENTRY_DSN", "\"\"")
+
     }
 
     bundle {
@@ -115,6 +101,7 @@ android {
         }
         create("full") {
             dimension = "app"
+            buildConfigField("String", "SENTRY_DSN", "\"${localBuildProperties.getProperty("SENTRY_DSN", "")}\"")
         }
     }
 
@@ -178,23 +165,15 @@ sentry {
     ignoredFlavors.set(setOf("foss"))
     ignoredBuildTypes.set(setOf("debug"))
     autoInstallation.enabled = false
-    val token =
-        try {
-            println("Full build detected, enabling Sentry Auth Token")
-            val properties = Properties()
-            properties.load(rootProject.file("local.properties").inputStream())
-            properties.getProperty("SENTRY_AUTH_TOKEN")
-        } catch (e: Exception) {
-            println("Failed to load SENTRY_AUTH_TOKEN from local.properties: ${e.message}")
-            null
-        }
+    val token = localBuildProperties.getProperty("SENTRY_AUTH_TOKEN")
     authToken.set(token ?: "")
     includeProguardMapping.set(true)
-    autoUploadProguardMapping.set(true)
+    autoUploadProguardMapping.set(!token.isNullOrBlank())
     telemetry.set(false)
 }
 
 dependencies {
+    implementation(project(":nativeMedia"))
     val fullImplementation = "fullImplementation"
     val debugImplementation = "debugImplementation"
 

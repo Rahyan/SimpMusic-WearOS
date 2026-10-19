@@ -9,6 +9,8 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import com.maxrave.common.Config
 import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
@@ -27,6 +29,7 @@ class WearMainActivity : ComponentActivity() {
 
     private var didDebugAutoplay = false
     private var pendingTileAction: String? = null
+    private var tileRoute by androidx.compose.runtime.mutableStateOf<String?>(null)
 
     private var shouldUnbind = false
     private val serviceConnection =
@@ -51,7 +54,7 @@ class WearMainActivity : ComponentActivity() {
         consumeTileActionFromIntent(intent)
         setContent {
             WearTheme {
-                WearAppRoot(mediaPlayerHandler = mediaPlayerHandler)
+                WearAppRoot(mediaPlayerHandler = mediaPlayerHandler, requestedRoute = tileRoute, onRouteHandled = { tileRoute = null })
             }
         }
     }
@@ -141,6 +144,13 @@ class WearMainActivity : ComponentActivity() {
                 SimpMusicTileService.ACTION_PLAY_PAUSE -> mediaPlayerHandler.onPlayerEvent(PlayerEvent.PlayPause)
                 SimpMusicTileService.ACTION_NEXT -> mediaPlayerHandler.onPlayerEvent(PlayerEvent.Next)
                 SimpMusicTileService.ACTION_PREVIOUS -> mediaPlayerHandler.onPlayerEvent(PlayerEvent.Previous)
+                SimpMusicTileService.ACTION_OFFLINE -> {
+                    try {
+                        com.maxrave.simpmusic.wear.offline.OfflineQueue(applicationContext).play(mediaPlayerHandler)
+                        tileRoute = "now_playing"
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (_: Exception) { tileRoute = "downloads" }
+                }
                 else -> Unit
             }
         }

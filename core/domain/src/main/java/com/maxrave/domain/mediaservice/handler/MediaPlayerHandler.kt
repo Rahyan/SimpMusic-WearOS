@@ -29,6 +29,7 @@ interface MediaPlayerHandler {
     val skipSegments: StateFlow<List<SponsorSkipSegments>?>
     val format: StateFlow<NewFormatEntity?>
     val currentSongIndex: StateFlow<Int>
+    val addToQueueBlock: StateFlow<AddToQueueBlock?>
 
     // Playback control
     suspend fun onPlayerEvent(playerEvent: PlayerEvent)
@@ -100,7 +101,7 @@ interface MediaPlayerHandler {
     suspend fun loadMoreCatalog(
         listTrack: ArrayList<Track>,
         isAddToQueue: Boolean = false,
-    )
+    ): Boolean
 
     suspend fun updateCatalog(
         downloaded: Int = 0,

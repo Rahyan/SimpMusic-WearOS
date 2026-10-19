@@ -6,8 +6,6 @@ import android.graphics.Bitmap
 import android.graphics.Bitmap.CompressFormat.JPEG
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
 import com.liskovsoft.sharedutils.prefs.GlobalPreferences
 import com.liskovsoft.youtubeapi.app.AppService
 import com.liskovsoft.youtubeapi.videoinfo.V2.VideoInfoService
@@ -41,6 +39,11 @@ import com.maxrave.kotlinytmusicscraper.models.YouTubeClient.Companion.MWEB
 import com.maxrave.kotlinytmusicscraper.models.YouTubeClient.Companion.TVHTML5
 import com.maxrave.kotlinytmusicscraper.models.YouTubeClient.Companion.WEB
 import com.maxrave.kotlinytmusicscraper.models.YouTubeClient.Companion.WEB_REMIX
+import com.maxrave.kotlinytmusicscraper.models.YouTubeClient.Companion.VISIONOS
+import com.maxrave.kotlinytmusicscraper.models.YouTubeClient.Companion.WEB_EMBEDDED
+import com.maxrave.kotlinytmusicscraper.utils.firstPlayableProvider
+import com.maxrave.kotlinytmusicscraper.utils.responseWithExtractedStreams
+import org.schabi.newpipe.extractor.stream.AudioStream
 import com.maxrave.kotlinytmusicscraper.models.YouTubeLocale
 import com.maxrave.kotlinytmusicscraper.models.getContinuation
 import com.maxrave.kotlinytmusicscraper.models.oddElements
@@ -82,12 +85,14 @@ import com.maxrave.kotlinytmusicscraper.pages.SearchResult
 import com.maxrave.kotlinytmusicscraper.pages.SearchSuggestionPage
 import com.maxrave.kotlinytmusicscraper.parser.fromPlaylistContinuationToTracks
 import com.maxrave.kotlinytmusicscraper.parser.fromPlaylistToTrack
+import com.maxrave.kotlinytmusicscraper.parser.fromPlaylistContinuationToTrackWithSetVideoId
 import com.maxrave.kotlinytmusicscraper.parser.fromPlaylistToTrackWithSetVideoId
 import com.maxrave.kotlinytmusicscraper.parser.getContinuePlaylistContinuation
 import com.maxrave.kotlinytmusicscraper.parser.getPlaylistContinuation
 import com.maxrave.kotlinytmusicscraper.parser.getReloadParams
 import com.maxrave.kotlinytmusicscraper.parser.getSuggestionSongItems
 import com.maxrave.kotlinytmusicscraper.parser.hasReloadParams
+import com.maxrave.kotlinytmusicscraper.utils.isFailedTransfer
 import com.maxrave.kotlinytmusicscraper.utils.NewPipeDownloaderImpl
 import com.maxrave.kotlinytmusicscraper.utils.NewPipeUtils
 import com.maxrave.kotlinytmusicscraper.utils.poTokenUtils.NewPipePoTokenProviderImpl
@@ -102,6 +107,7 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.URLBuilder
 import io.ktor.http.parseQueryString
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -187,8 +193,8 @@ class YouTube(
             context = context,
             downloader = newPipeDownloader,
         )
-    private val mAppService = AppService.instance()
-    private val mVideoInfoService = VideoInfoService.instance()
+    private val mAppService by lazy { AppService.instance() }
+    private val mVideoInfoService by lazy { VideoInfoService.instance() }
 
     var cachePath: File?
         get() = ytMusic.cachePath
@@ -749,7 +755,8 @@ class YouTube(
                 response.fromPlaylistToTrackWithSetVideoId(),
             )
             var continuation = response.getPlaylistContinuation()
-            while (continuation != null) {
+            val seenContinuations = mutableSetOf<String>()
+            while (continuation != null && seenContinuations.add(continuation)) {
                 val continuationResponse =
                     ytMusic
                         .browse(
@@ -759,11 +766,12 @@ class YouTube(
                             continuation = continuation,
                         ).body<BrowseResponse>()
                 listPair.addAll(
-                    continuationResponse.fromPlaylistToTrackWithSetVideoId(),
+                    continuationResponse.fromPlaylistContinuationToTrackWithSetVideoId(),
                 )
-                continuation = continuationResponse.getContinuePlaylistContinuation()
+                continuation = continuationResponse.getPlaylistContinuation()
             }
 
+            check(continuation == null) { "Playlist continuation repeated; retry to finish." }
             return@runCatching listPair
         }
 
@@ -776,7 +784,8 @@ class YouTube(
                     ).body<BrowseResponse>()
             var continuation = initialResponse.getPlaylistContinuation()
             Logger.d(TAG, "YouTube: getSuggestionsTrackForPlaylist: $continuation")
-            while (continuation != null) {
+            val seenContinuations = mutableSetOf<String>()
+            while (continuation != null && seenContinuations.add(continuation)) {
                 val continuationResponse =
                     ytMusic
                         .browse(
@@ -789,7 +798,7 @@ class YouTube(
                 if (continuationResponse.hasReloadParams()) {
                     return@runCatching Pair(continuationResponse.getReloadParams(), continuationResponse.getSuggestionSongItems())
                 } else {
-                    continuation = continuationResponse.getContinuePlaylistContinuation()
+                    continuation = continuationResponse.getPlaylistContinuation()
                 }
             }
             return@runCatching null
@@ -803,7 +812,8 @@ class YouTube(
                 response.fromPlaylistToTrack(),
             )
             var continuation = response.getPlaylistContinuation()
-            while (continuation != null) {
+            val seenContinuations = mutableSetOf<String>()
+            while (continuation != null && seenContinuations.add(continuation)) {
                 val continuationResponse =
                     ytMusic
                         .browse(
@@ -815,8 +825,9 @@ class YouTube(
                 songs.addAll(
                     continuationResponse.fromPlaylistContinuationToTracks(),
                 )
-                continuation = continuationResponse.getContinuePlaylistContinuation()
+                continuation = continuationResponse.getPlaylistContinuation()
             }
+            check(continuation == null) { "Playlist continuation repeated; retry to finish." }
             return@runCatching songs
         }
 
@@ -1292,7 +1303,6 @@ class YouTube(
                         ?.ytConfigData
                         ?.visitorData
             Logger.d(TAG, "Visitor Data $visitorData")
-            Logger.d(TAG, "New Cookie $cookie")
             Logger.d(TAG, "Playback Tracking $playbackTracking")
             return Triple(cookie, visitorData ?: this@YouTube.visitorData ?: "", playbackTracking)
         } catch (e: Exception) {
@@ -1357,7 +1367,6 @@ class YouTube(
         }
         val randomUrl = listUrlSig.randomOrNull() ?: return null
         if (listUrlSig.isNotEmpty()) {
-            Logger.d(TAG, "YouTube Ytdlp Found URL $randomUrl")
             return decodedSigResponse
         } else {
             Logger.d(TAG, "YouTube Ytdlp No URL Found")
@@ -1369,6 +1378,8 @@ class YouTube(
         videoId: String,
         tempRes: PlayerResponse,
     ): PlayerResponse? {
+        // Avoid expensive service initialization when there are no seed formats to patch.
+        if (tempRes.streamingData == null) return null
         try {
             if (GlobalPreferences.sInstance == null) {
                 GlobalPreferences.instance(context)
@@ -1395,7 +1406,6 @@ class YouTube(
                 (videoInfo?.regularFormats ?: emptyList()) +
                 (videoInfo?.restrictedFormats ?: emptyList())
         streamsList.forEach {
-            Logger.d(TAG, "YouTube SmartTube Audio Stream ${it.iTag} ${it.url}")
         }
 
         decodedSigResponse =
@@ -1431,7 +1441,6 @@ class YouTube(
                     ?.let { addAll(it) }
             },
         )
-        Logger.d(TAG, "YouTube URL ${decodedSigResponse.streamingData?.formats?.mapNotNull { it.url }}")
         val listFormat =
             (
                 decodedSigResponse
@@ -1463,64 +1472,46 @@ class YouTube(
         videoId: String,
         tempRes: PlayerResponse,
     ): PlayerResponse? {
-        val listUrlSig = mutableListOf<String>()
-        var decodedSigResponse: PlayerResponse?
-        var sigResponse: PlayerResponse?
-        Logger.d(TAG, "YouTube TempRes ${tempRes.playabilityStatus}")
-        // Even when the InnerTube player response is UNPLAYABLE, external extractors may still
-        // be able to provide usable stream URLs. Prefer "does it have streamingData we can patch"
-        // over the playability status.
-        sigResponse = tempRes
-        if (sigResponse.streamingData == null) return null
-        val streamInfo = StreamInfo.getInfo(NewPipe.getService(0), "https://www.youtube.com/watch?v=$videoId")
-        val streamsList = streamInfo.audioStreams + streamInfo.videoStreams + streamInfo.videoOnlyStreams
-        streamsList.forEach {
-            Logger.d(TAG, "YouTube NewPipe Audio Stream ${it.itagItem?.id} ${it.content}")
+        val info = com.maxrave.kotlinytmusicscraper.utils.BlockingExtraction.run {
+            StreamInfo.getInfo(NewPipe.getService(0), "https://www.youtube.com/watch?v=$videoId")
         }
-        decodedSigResponse =
-            sigResponse.copy(
-                streamingData =
-                    sigResponse.streamingData?.copy(
-                        formats =
-                            sigResponse.streamingData.formats?.map { format ->
-                                format.copy(
-                                    url = streamsList.find { it.itagItem?.id == format.itag }?.content,
-                                )
-                            },
-                        adaptiveFormats =
-                            sigResponse.streamingData.adaptiveFormats.map { adaptiveFormats ->
-                                adaptiveFormats.copy(
-                                    url = streamsList.find { it.itagItem?.id == adaptiveFormats.itag }?.content,
-                                )
-                            },
-                    ),
+        val formats = (info.audioStreams + info.videoStreams + info.videoOnlyStreams).mapNotNull { stream ->
+            val itag = stream.itagItem ?: return@mapNotNull null
+            if (!stream.isUrl || stream.content.isBlank()) return@mapNotNull null
+            val audio = stream is AudioStream
+            PlayerResponse.StreamingData.Format(
+                itag = itag.id, url = stream.content,
+                mimeType = itag.mediaFormat.mimeType,
+                bitrate = itag.bitrate.coerceAtLeast(0),
+                width = if (audio) null else itag.width.takeIf { it > 0 },
+                height = if (audio) null else itag.height.takeIf { it > 0 },
+                contentLength = itag.contentLength.takeIf { it > 0 },
+                quality = itag.quality.orEmpty(), fps = itag.fps.takeIf { it > 0 },
+                qualityLabel = if (audio) null else itag.resolutionString,
+                averageBitrate = itag.averageBitrate.takeIf { it > 0 },
+                audioQuality = if (audio) "AUDIO_QUALITY_MEDIUM" else null,
+                approxDurationMs = (info.duration * 1000).takeIf { it > 0 }?.toString(),
+                audioSampleRate = itag.sampleRate.takeIf { it > 0 },
+                audioChannels = itag.audioChannels.takeIf { it > 0 },
+                loudnessDb = null, lastModified = null, signatureCipher = null,
             )
-        listUrlSig.addAll(
-            (
-                decodedSigResponse
-                    .streamingData
-                    ?.adaptiveFormats
-                    ?.mapNotNull { it.url }
-                    ?.toMutableList() ?: mutableListOf()
-            ).apply {
-                decodedSigResponse
-                    .streamingData
-                    ?.formats
-                    ?.mapNotNull { it.url }
-                    ?.let { addAll(it) }
-            },
+        }
+        Logger.d(TAG, "NewPipe extracted ${formats.size} formats for $videoId")
+        val extractedSeed = tempRes.copy(
+            videoDetails = tempRes.videoDetails ?: PlayerResponse.VideoDetails(
+                videoId = videoId, title = info.name, author = info.uploaderName,
+                channelId = info.uploaderUrl.substringAfterLast('/'), authorAvatar = null,
+                authorSubCount = null, lengthSeconds = info.duration.toString(),
+                musicVideoType = null, viewCount = null,
+                thumbnail = com.maxrave.kotlinytmusicscraper.models.Thumbnails(
+                    info.thumbnails.map { com.maxrave.kotlinytmusicscraper.models.Thumbnail(
+                        url = it.url, width = it.width.takeIf { size -> size > 0 },
+                        height = it.height.takeIf { size -> size > 0 },
+                    ) },
+                ), description = null,
+            ),
         )
-        listUrlSig.forEach {
-            Logger.d(TAG, "YouTube NewPipe URL $it")
-        }
-        val randomUrl = listUrlSig.randomOrNull() ?: return null
-        if (listUrlSig.isNotEmpty()) {
-            Logger.d(TAG, "YouTube NewPipe Found URL $randomUrl")
-            return decodedSigResponse
-        } else {
-            Logger.d(TAG, "YouTube NewPipe No URL Found")
-            return null
-        }
+        return responseWithExtractedStreams(extractedSeed, formats)
     }
 
     fun isManifestUrl(url: String): Boolean = url.contains(".m3u8") || url.contains(".mpd") || url.contains("manifest")
@@ -1538,6 +1529,7 @@ class YouTube(
 
     private fun headersForClient(clientId: String?): YouTubeHttpHeaders {
         return when (clientId?.uppercase()) {
+            "VISIONOS" -> YouTubeHttpHeaders(userAgent = VISIONOS.userAgent)
             "IOS" ->
                 YouTubeHttpHeaders(
                     userAgent = "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)",
@@ -1557,11 +1549,12 @@ class YouTube(
                         "com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12L; en_US; Quest 3) gzip",
                 )
 
-            "TVHTML5" ->
-                YouTubeHttpHeaders(
-                    userAgent =
-                        "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/3.0 TV Safari/537.36",
-                )
+            "TVHTML5" -> YouTubeHttpHeaders(userAgent = TVHTML5.userAgent)
+            "WEB_EMBEDDED_PLAYER" -> YouTubeHttpHeaders(
+                userAgent = WEB_EMBEDDED.userAgent,
+                origin = "https://www.youtube.com",
+                referer = "https://www.youtube.com/",
+            )
 
             "WEB", "WEB_REMIX", "MWEB" ->
                 YouTubeHttpHeaders(
@@ -1583,11 +1576,11 @@ class YouTube(
 
     private fun preferredPlayerClients(): List<YouTubeClient> =
         if (isWatch) {
-            // Wear strict mode: keep stream signing deterministic and avoid cross-client URL churn.
-            listOf(ANDROID_VR)
+            // VR-only playback stopped working. Try the current JS-less client first.
+            listOf(VISIONOS, WEB_EMBEDDED, WEB_REMIX, TVHTML5)
         } else {
             // InnerTune-style first chain, followed by web fallbacks.
-            listOf(ANDROID_MUSIC, IOS, TVHTML5, WEB_REMIX, WEB, MWEB)
+            listOf(VISIONOS, ANDROID_MUSIC, IOS, TVHTML5, WEB_REMIX, WEB, MWEB)
         }.distinctBy { it.clientName }
 
     private fun toProbeCandidates(response: PlayerResponse?): List<ProbeCandidate> {
@@ -1647,9 +1640,7 @@ class YouTube(
             if (StreamHealthRegistry.isUrlBlocked(candidate.url)) {
                 continue
             }
-            if (index >= maxChecks) {
-                return candidate
-            }
+            if (index >= maxChecks) break
             if (preflightGoogleVideoOrTrue(candidate.url, mediaId, sourceClientName)) {
                 StreamHealthRegistry.markUrlHealthy(candidate.url)
                 return candidate
@@ -1663,12 +1654,8 @@ class YouTube(
                 "Reject candidate mediaId=$mediaId stage=$stageLabel client=$candidateClient c=${StreamHealthRegistry.urlClient(candidate.url)} itag=${candidate.itag}",
             )
         }
-        return rankedCandidates
-            .firstOrNull { candidate ->
-                val clientName = StreamHealthRegistry.urlClient(candidate.url) ?: sourceClientName
-                (isWatch && clientName.equals(ANDROID_VR.clientName, ignoreCase = true)) ||
-                    !StreamHealthRegistry.isClientBlocked(mediaId, clientName)
-            }?.also { StreamHealthRegistry.markUrlHealthy(it.url) }
+        // Never promote a URL that just failed validation back to healthy.
+        return null
     }
 
     private suspend fun resolveViaProxyFallback(
@@ -1706,6 +1693,7 @@ class YouTube(
                 }
                 null
             }.onFailure {
+                if (it is CancellationException) throw it
                 Logger.w(TAG, "Proxy fallback failed mediaId=$videoId instance=$instance reason=${it.message}")
             }
         }
@@ -1734,7 +1722,36 @@ class YouTube(
             var resolvedClientName: String? = null
             var resolvedProviderName: String? = null
             var proxySeedResponse: PlayerResponse? = null
+            if (isWatch) {
+                // Current NewPipe succeeded on hardware where the hand-built clients failed.
+                // Extraction must not wait for an InnerTube response just to obtain a seed.
+                val seed = PlayerResponse(
+                    responseContext = com.maxrave.kotlinytmusicscraper.models.ResponseContext(serviceTrackingParams = null),
+                    playabilityStatus = PlayerResponse.PlayabilityStatus("UNPLAYABLE", null),
+                    playerConfig = null, streamingData = null, videoDetails = null,
+                    playbackTracking = null, captions = null,
+                )
+                proxySeedResponse = seed
+                val extracted = firstPlayableProvider<PlayerResponse>(
+                    providers = listOf<Pair<String, suspend () -> PlayerResponse?>>(
+                        "newpipe" to { newPipePlayer(videoId, seed) },
+                    ),
+                    isPlayable = { provider, response ->
+                        pickPlayableCandidate(videoId, toProbeCandidates(response), 7,
+                            stageLabel = "external:$provider") != null
+                    },
+                    onFailure = { provider, error ->
+                        Logger.w(TAG, "External provider failed provider=$provider error=${error.javaClass.simpleName}")
+                    },
+                )
+                if (extracted != null) {
+                    decodedSigResponse = extracted.second
+                    resolvedClientName = "EXTERNAL"
+                    resolvedProviderName = extracted.first
+                }
+            }
             clientLoop@ for (client in listClients) {
+                if (decodedSigResponse != null) break@clientLoop
                 val enforceBlock = !(isWatch && client.clientName.equals(ANDROID_VR.clientName, ignoreCase = true))
                 if (enforceBlock && StreamHealthRegistry.isClientBlocked(videoId, client.clientName)) {
                     Logger.w(TAG, "Skip blocked client mediaId=$videoId client=${client.clientName}")
@@ -1742,6 +1759,7 @@ class YouTube(
                 }
                 val tempRes =
                     try {
+                        kotlinx.coroutines.withTimeoutOrNull(if (isWatch) 8_000L else 30_000L) {
                         ytMusic
                             .player(
                                 client,
@@ -1751,7 +1769,9 @@ class YouTube(
 //                                signatureTimestamp = YoutubeJavaScriptPlayerManager.getSignatureTimestamp(videoId),
 //                                poToken = getWebClientPoTokenOrNull(videoId)?.streamingDataPoToken,
                             ).body<PlayerResponse>()
+                        }
                     } catch (e: Exception) {
+                        if (e is CancellationException) throw e
                         if (!isWatch) {
                             Logger.d(TAG, "YouTube Player request failed with client ${client.clientName}: ${e.message}")
                         }
@@ -1760,40 +1780,72 @@ class YouTube(
                         }
                         continue
                     }
-                proxySeedResponse = tempRes
+                if (tempRes == null) {
+                    Logger.w(TAG, "Player request timed out client=${client.clientName}")
+                    continue@clientLoop
+                }
+                if (proxySeedResponse?.streamingData == null || tempRes.streamingData != null) {
+                    proxySeedResponse = tempRes
+                }
+                Logger.w(TAG, "Player response client=${client.clientName} status=${tempRes.playabilityStatus.status} formats=${tempRes.streamingData?.adaptiveFormats?.size ?: 0}")
 
-                val providerResponses =
-                    buildList<Pair<String, PlayerResponse>> {
-                        decodeCipherStreamingDataOrNull(tempRes)?.let { add("cipher" to it) }
-                        newPipePlayer(videoId, tempRes)?.let { add("newpipe" to it) }
-                        smartTubePlayer(videoId, tempRes)?.let { add("smarttube" to it) }
+                val providers =
+                    buildList<Pair<String, suspend () -> PlayerResponse?>> {
+                        add("cipher" to { decodeCipherStreamingDataOrNull(tempRes) })
+                        if (!isWatch) {
+                            add("newpipe" to { newPipePlayer(videoId, tempRes) })
+                            add("smarttube" to { smartTubePlayer(videoId, tempRes) })
+                        }
                         if (shouldYtdlp || !isWatch) {
-                            ytDlpPlayer(videoId, tempRes)?.let { add("ytdlp" to it) }
+                            add("ytdlp" to { ytDlpPlayer(videoId, tempRes) })
                         }
                     }
-
-                for ((providerName, response) in providerResponses) {
-                    val probeCandidates = toProbeCandidates(response)
-                    val playableCandidate =
+                val resolved = firstPlayableProvider(
+                    providers = providers,
+                    isPlayable = { providerName, response ->
                         pickPlayableCandidate(
                             mediaId = videoId,
-                            candidates = probeCandidates,
+                            candidates = toProbeCandidates(response),
                             maxChecks = if (isWatch) 7 else 9,
                             sourceClientName = client.clientName,
                             stageLabel = "direct:$providerName",
-                        )
-                    if (playableCandidate != null) {
-                        decodedSigResponse = response
+                        ) != null
+                    },
+                    onFailure = { providerName, error ->
+                        Logger.w(TAG, "Player provider failed client=${client.clientName} provider=$providerName error=${error.javaClass.simpleName}")
+                    },
+                )
+                if (resolved != null) {
+                        decodedSigResponse = resolved.second
                         resolvedClientName = client.clientName
-                        resolvedProviderName = providerName
+                        resolvedProviderName = resolved.first
                         break@clientLoop
-                    }
                 }
                 if (!isWatch) {
                     Logger.d(TAG, "YouTube Player no playable URL with client ${client.clientName}")
                 }
             }
 
+            if (decodedSigResponse == null && isWatch && proxySeedResponse != null) {
+                val seed = proxySeedResponse
+                val extracted = firstPlayableProvider<PlayerResponse>(
+                    providers = listOf<Pair<String, suspend () -> PlayerResponse?>>(
+                        "smarttube" to { smartTubePlayer(videoId, seed) },
+                    ),
+                    isPlayable = { provider, response ->
+                        pickPlayableCandidate(videoId, toProbeCandidates(response), 7,
+                            stageLabel = "external:$provider") != null
+                    },
+                    onFailure = { provider, error ->
+                        Logger.w(TAG, "External provider failed provider=$provider error=${error.javaClass.simpleName}")
+                    },
+                )
+                if (extracted != null) {
+                    decodedSigResponse = extracted.second
+                    resolvedClientName = "EXTERNAL"
+                    resolvedProviderName = extracted.first
+                }
+            }
             if (decodedSigResponse == null && proxyFallbackEnabled && proxySeedResponse != null) {
                 resolveViaProxyFallback(
                     videoId = videoId,
@@ -1816,7 +1868,8 @@ class YouTube(
                 }
             }
             if (decodedSigResponse == null) {
-                val noLoginClient = if (isWatch) ANDROID_VR else IOS
+                if (isWatch) throw IllegalStateException("No playable stream from current YouTube clients")
+                val noLoginClient = IOS
                 val (tempCookie, visitorData, playbackTracking) = getVisitorData(videoId, playlistId)
                 val now = System.currentTimeMillis()
                 val poToken =
@@ -1838,7 +1891,6 @@ class YouTube(
                                 }
 		                            }
 		                    }
-		                if (!isWatch) Logger.d(TAG, "PoToken $poToken")
 		                val rawPlayerResponse =
                             ytMusic.noLogInPlayer(
                                 client = noLoginClient,
@@ -1849,7 +1901,6 @@ class YouTube(
                             ).body<PlayerResponse>()
 		                val playerResponse = decodeCipherStreamingDataOrNull(rawPlayerResponse) ?: rawPlayerResponse
 		                if (!isWatch) {
-		                    Logger.d(TAG, "Player Response $playerResponse")
 		                    Logger.d(TAG, "Thumbnails " + playerResponse.videoDetails?.thumbnail)
 		                    Logger.d(TAG, "Player Response status: ${playerResponse.playabilityStatus.status}")
 	                }
@@ -1872,7 +1923,6 @@ class YouTube(
                         sourceClientName = noLoginClient.clientName,
                         stageLabel = "nologin",
                     )
-	                if (!isWatch) Logger.d(TAG, "Player Response playableUrl ${playableCandidate?.url}")
 
                 if (playerResponse.playabilityStatus.status == "OK" &&
                     (formatList != null || adaptiveFormatsList != null) &&
@@ -1925,7 +1975,7 @@ class YouTube(
                     thumbnails,
                 )
             }
-        }
+        }.onFailure { if (it is CancellationException) throw it }
 
     /**
      * Lightweight "does this URL work?" probe.
@@ -2429,7 +2479,6 @@ class YouTube(
                     .bodyAsText()
                     .removePrefix(")]}'\n")
             val accountSwitcherEndpointResponse = ytMusic.normalJson.decodeFromString<AccountSwitcherEndpointResponse>(res)
-            Logger.d(TAG, "Account List Response: $accountSwitcherEndpointResponse")
             accountSwitcherEndpointResponse.toListAccountInfo()
         }
 
@@ -2667,15 +2716,20 @@ class YouTube(
                         ).maxByOrNull { it?.bitrate ?: 0 }
                     Logger.d(TAG, "Audio Format $audioFormat")
                     Logger.d(TAG, "Video Format $videoFormat")
-                    val audioUrl = audioFormat?.url ?: return@channelFlow
-                    val videoUrl = videoFormat?.url ?: return@channelFlow
+                    val audioUrl = audioFormat?.url
+                    val videoUrl = videoFormat?.url
+                    if (audioUrl.isNullOrBlank() || (isVideo && videoUrl.isNullOrBlank())) {
+                        trySend(DownloadProgress.failed("No downloadable stream"))
+                        return@channelFlow
+                    }
                     if (isVideo) {
                         runCatching {
-                            val downloadAudioJob = ytMusic.download(audioUrl, ("$filePath.webm"))
-                            val downloadVideoJob = ytMusic.download(videoUrl, ("$filePath.mp4"))
+                            val downloadAudioJob = ytMusic.download(audioUrl, "$filePath.webm", audioFormat?.contentLength)
+                            val downloadVideoJob = ytMusic.download(requireNotNull(videoUrl), "$filePath.mp4", videoFormat?.contentLength)
                             combine(downloadVideoJob, downloadAudioJob) { videoProgress, audioProgress ->
                                 Pair(videoProgress, audioProgress)
                             }.collectLatest { (videoProgress, audioProgress) ->
+                                if (videoProgress.isFailedTransfer() || audioProgress.isFailedTransfer()) throw IOException("Download failed")
                                 if (!videoProgress.first || !audioProgress.first) {
                                     trySend(
                                         DownloadProgress(
@@ -2709,10 +2763,10 @@ class YouTube(
                                     }
 
                                     val session =
-                                        FFmpegKit.execute(
+                                        NativeMediaTools.transcode(
                                             command,
                                         )
-                                    if (ReturnCode.isSuccess(session.returnCode)) {
+                                    if (NativeMediaTools.isSuccess(session.returnCode)) {
                                         // SUCCESS
                                         Logger.d(TAG, "Command succeeded ${session.state}, ${session.returnCode}")
                                         try {
@@ -2723,7 +2777,7 @@ class YouTube(
                                             e.printStackTrace()
                                         }
                                         trySend(DownloadProgress.VIDEO_DONE)
-                                    } else if (ReturnCode.isCancel(session.returnCode)) {
+                                    } else if (NativeMediaTools.isCancel(session.returnCode)) {
                                         // CANCEL
                                         Logger.d(TAG, "Command cancelled ${session.state}, ${session.returnCode}")
                                         try {
@@ -2751,6 +2805,7 @@ class YouTube(
                         }.onSuccess {
                             Logger.d(TAG, "Download Video Success")
                         }.onFailure {
+                            if (it is CancellationException) throw it
                             it.printStackTrace()
                             trySend(DownloadProgress.failed(it.message ?: "Download failed"))
                         }
@@ -2758,15 +2813,17 @@ class YouTube(
                         // Song if url is not null
                         runCatching {
                             ytMusic
-                                .download(audioUrl, ("$filePath.webm"))
+                                .download(audioUrl, "$filePath.webm", audioFormat?.contentLength)
                                 .collect { downloadProgress ->
                                     if (!downloadProgress.first) {
                                         trySend(DownloadProgress(audioDownloadProgress = downloadProgress.second))
+                                    } else if (downloadProgress.isFailedTransfer()) {
+                                        throw IOException("Download failed")
                                     } else {
-                                        trySend(DownloadProgress(audioDownloadProgress = 1f, isDone = true))
+                                        trySend(DownloadProgress(audioDownloadProgress = 1f, isMerging = true))
                                     }
                                 }
-                        }.onSuccess {
+                        }.onSuccess audioComplete@ {
                             Logger.d(TAG, "Download only Audio Success")
                             // Convert to mp3
                             val command =
@@ -2789,10 +2846,10 @@ class YouTube(
                             }
 
                             val session =
-                                FFmpegKit.execute(
+                                NativeMediaTools.transcode(
                                     command,
                                 )
-                            if (ReturnCode.isSuccess(session.returnCode)) {
+                            if (NativeMediaTools.isSuccess(session.returnCode)) {
                                 // SUCCESS
                                 Logger.d(TAG, "Command succeeded ${session.state}, ${session.returnCode}")
                                 try {
@@ -2800,7 +2857,7 @@ class YouTube(
                                 } catch (e: IOException) {
                                     e.printStackTrace()
                                 }
-                            } else if (ReturnCode.isCancel(session.returnCode)) {
+                            } else if (NativeMediaTools.isCancel(session.returnCode)) {
                                 // CANCEL
                                 Logger.d(TAG, "Command cancelled ${session.state}, ${session.returnCode}")
                                 try {
@@ -2822,6 +2879,7 @@ class YouTube(
                                 trySend(DownloadProgress.failed("Error"))
                             }
 
+                            if (!NativeMediaTools.isSuccess(session.returnCode)) return@audioComplete
                             val commandInject =
                                 listOf(
                                     "-i",
@@ -2841,10 +2899,10 @@ class YouTube(
                                     "$filePath-simpmusic.mp3",
                                 ).joinToString(" ")
                             val sessionInject =
-                                FFmpegKit.execute(
+                                NativeMediaTools.transcode(
                                     commandInject,
                                 )
-                            if (ReturnCode.isSuccess(sessionInject.returnCode)) {
+                            if (NativeMediaTools.isSuccess(sessionInject.returnCode)) {
                                 // SUCCESS
                                 Logger.d(TAG, "Command succeeded ${sessionInject.state}, ${sessionInject.returnCode}")
                                 try {
@@ -2855,7 +2913,7 @@ class YouTube(
                                     e.printStackTrace()
                                 }
                                 trySend(DownloadProgress.AUDIO_DONE)
-                            } else if (ReturnCode.isCancel(sessionInject.returnCode)) {
+                            } else if (NativeMediaTools.isCancel(sessionInject.returnCode)) {
                                 // CANCEL
                                 Logger.d(TAG, "Command cancelled ${sessionInject.state}, ${sessionInject.returnCode}")
                                 try {
@@ -2879,11 +2937,13 @@ class YouTube(
                                 trySend(DownloadProgress.failed("Error"))
                             }
                         }.onFailure { e ->
+                            if (e is CancellationException) throw e
                             e.printStackTrace()
                             trySend(DownloadProgress.failed(e.message ?: "Download failed"))
                         }
                     }
                 }.onFailure {
+                    if (it is CancellationException) throw it
                     it.printStackTrace()
                     Logger.d(TAG, "Player Response is null")
                     trySend(DownloadProgress.failed(it.message ?: "Player response is null"))

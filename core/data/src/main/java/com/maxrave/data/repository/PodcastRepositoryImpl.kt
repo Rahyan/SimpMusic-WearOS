@@ -15,6 +15,7 @@ import com.maxrave.domain.repository.PodcastRepository
 import com.maxrave.domain.utils.Resource
 import com.maxrave.kotlinytmusicscraper.YouTube
 import com.maxrave.logger.Logger
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -24,6 +25,8 @@ internal class PodcastRepositoryImpl(
     private val localDataSource: LocalDataSource,
     private val youTube: YouTube,
 ) : PodcastRepository {
+    override suspend fun updatePodcastMetadata(item: PodcastsEntity) = withContext(Dispatchers.IO) { localDataSource.updatePodcastMetadata(item) }
+
     override fun getPodcastData(podcastId: String): Flow<Resource<PodcastBrowse>> =
         flow {
             runCatching {
@@ -233,7 +236,9 @@ internal class PodcastRepositoryImpl(
         podcastId: String,
         favorite: Boolean,
     ) = flow {
-        emit(localDataSource.favoritePodcast(podcastId, favorite))
+        val changed = localDataSource.favoritePodcast(podcastId, favorite)
+        if (changed) com.maxrave.common.LocalLibraryEdits.changed("podcasts", podcastId, favorite)
+        emit(changed)
     }.flowOn(Dispatchers.IO)
 
     override fun getPodcastEpisodes(podcastId: String): Flow<List<EpisodeEntity>> =

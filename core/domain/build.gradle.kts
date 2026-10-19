@@ -39,6 +39,7 @@ android {
 }
 
 dependencies {
+    testImplementation(libs.junit)
     implementation(libs.room.runtime)
     implementation(libs.kotlinx.serialization.json)
     implementation(project(":common"))

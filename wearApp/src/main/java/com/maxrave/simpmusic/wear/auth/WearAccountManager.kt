@@ -3,7 +3,6 @@ package com.maxrave.simpmusic.wear.auth
 import android.content.Context
 import com.maxrave.common.Config
 import com.maxrave.domain.data.entities.GoogleAccountEntity
-import com.maxrave.domain.extension.toNetScapeString
 import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.repository.AccountRepository
 import com.maxrave.domain.repository.CommonRepository
@@ -117,9 +116,8 @@ class WearAccountManager(
                     accountInfoList.first().thumbnails.lastOrNull()?.url ?: "",
                 )
 
-                // Export cookies for ytdlp/newpipe-based extractors.
-                val cookieItem = commonRepository.getCookiesFromInternalDatabase(Config.YOUTUBE_MUSIC_MAIN_URL)
-                val netscapeCookie = cookieItem.toNetScapeString()
+                // Wear OS has no WebView; export the actual relayed cookie instead.
+                val netscapeCookie = relayCookiesToNetscape(cookie)
                 commonRepository.writeTextToFile(netscapeCookie, File(context.filesDir, "ytdlp-cookie.txt").path)
 
                 accountInfoList.forEachIndexed { index, account ->
@@ -138,6 +136,7 @@ class WearAccountManager(
                 }
 
                 dataStoreManager.setLoggedIn(true)
+                dataStoreManager.putString(com.maxrave.common.WearCompanionBridge.KEY_WEAR_EXPLICIT_LOGOUT, DataStoreManager.FALSE)
                 dataStoreManager.setCookie(cookie, accountInfoList.first().pageId)
                 true
             } catch (_: Throwable) {
@@ -159,6 +158,7 @@ class WearAccountManager(
                 dataStoreManager.putString("AccountThumbUrl", "")
                 dataStoreManager.setLoggedIn(false)
                 dataStoreManager.setCookie("", null)
+                File(context.filesDir, "ytdlp-cookie.txt").delete()
                 return@withContext
             }
 
@@ -166,17 +166,20 @@ class WearAccountManager(
             dataStoreManager.putString("AccountThumbUrl", acc.thumbnailUrl)
             accountRepository.updateGoogleAccountUsed(acc.email, true).singleOrNull()
 
-            acc.netscapeCookie?.let {
-                commonRepository.writeTextToFile(it, File(context.filesDir, "ytdlp-cookie.txt").path)
-            }
+            commonRepository.writeTextToFile(
+                acc.netscapeCookie ?: relayCookiesToNetscape(acc.cache.orEmpty()),
+                File(context.filesDir, "ytdlp-cookie.txt").path,
+            )
 
             dataStoreManager.setCookie(acc.cache ?: "", acc.pageId)
             dataStoreManager.setLoggedIn(true)
+            dataStoreManager.putString(com.maxrave.common.WearCompanionBridge.KEY_WEAR_EXPLICIT_LOGOUT, DataStoreManager.FALSE)
         }
     }
 
     suspend fun logOutAll() {
         withContext(Dispatchers.IO) {
+            dataStoreManager.putString(com.maxrave.common.WearCompanionBridge.KEY_WEAR_EXPLICIT_LOGOUT, DataStoreManager.TRUE)
             accountRepository.getGoogleAccounts().lastOrNull()?.orEmpty()?.forEach { account ->
                 accountRepository.deleteGoogleAccount(account.email)
             }

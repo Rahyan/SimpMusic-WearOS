@@ -87,6 +87,20 @@ data class YouTubeClient(
                 xClientName = 28,
             )
 
+        // yt-dlp's current JS-less default (2026-10). Keep payload and UA in sync.
+        val VISIONOS =
+            YouTubeClient(
+                clientName = "VISIONOS",
+                clientVersion = "1.02",
+                api_key = "",
+                userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+                deviceMake = "Apple",
+                deviceModel = "RealityDevice17,1",
+                osName = "visionOS",
+                osVersion = "26.5.23O471",
+                xClientName = 101,
+            )
+
         val WEB =
             YouTubeClient(
                 clientName = "WEB",
@@ -98,19 +112,21 @@ data class YouTubeClient(
         val WEB_REMIX =
             YouTubeClient(
                 clientName = "WEB_REMIX",
-                clientVersion = "1.20250310.01.00",
+                clientVersion = "1.20260707.12.00",
                 api_key = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30",
                 userAgent = USER_AGENT_WEB,
                 referer = REFERER_YOUTUBE_MUSIC,
+                xClientName = 67,
             )
 
         val WEB_EMBEDDED =
             YouTubeClient(
                 clientName = "WEB_EMBEDDED_PLAYER",
-                clientVersion = "1.20250310.01.00",
+                clientVersion = "2.20260708.00.00",
                 api_key = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30",
-                userAgent = USER_AGENT_WEB,
-                referer = REFERER_YOUTUBE_MUSIC,
+                userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Safari/605.1.15,gzip(gfe)",
+                referer = "https://www.youtube.com/",
+                xClientName = 56,
             )
 
         val TVHTML5_SIMPLY =
@@ -124,9 +140,10 @@ data class YouTubeClient(
         val TVHTML5 =
             YouTubeClient(
                 clientName = "TVHTML5",
-                clientVersion = "7.20250312.16.00",
+                clientVersion = "7.20260707.07.00",
                 api_key = "AIzaSyDCU8hByM-4DrUqRUYnGn-3llEO78bcxq8",
-                userAgent = "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version",
+                userAgent = "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/25.lts.30.1034943-gold (unlike Gecko), Unknown_TV_Unknown_0/Unknown (Unknown, Unknown)",
+                xClientName = 7,
             )
 
         val IOS =

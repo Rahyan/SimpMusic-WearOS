@@ -24,6 +24,9 @@ class NewPipeDownloaderImpl(
         OkHttpClient
             .Builder()
             .proxy(proxy)
+            .connectTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
+            .callTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
             .build()
 
     @Throws(IOException::class, ReCaptchaException::class)
@@ -51,18 +54,14 @@ class NewPipeDownloaderImpl(
             }
         }
 
-        val response = client.newCall(requestBuilder.build()).execute()
-
-        if (response.code == 429) {
-            response.close()
-
-            throw ReCaptchaException("reCaptcha Challenge requested", url)
+        val call = client.newCall(requestBuilder.build())
+        return BlockingExtraction.request(call) {
+            call.execute().use { response ->
+                if (response.code == 429) throw ReCaptchaException("reCaptcha Challenge requested", url)
+                Response(response.code, response.message, response.headers.toMultimap(),
+                    response.body?.string(), response.request.url.toString())
+            }
         }
-
-        val responseBodyToReturn = response.body?.string()
-
-        val latestUrl = response.request.url.toString()
-        return Response(response.code, response.message, response.headers.toMultimap(), responseBodyToReturn, latestUrl)
     }
 }
 

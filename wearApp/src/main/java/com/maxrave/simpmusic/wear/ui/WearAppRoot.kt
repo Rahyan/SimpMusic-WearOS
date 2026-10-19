@@ -53,6 +53,7 @@ import com.maxrave.simpmusic.wear.ui.screens.VolumeScreen
 import com.maxrave.simpmusic.wear.ui.screens.YtPlaylistScreen
 import org.koin.core.context.GlobalContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import java.util.concurrent.atomic.AtomicBoolean
 
 private object Routes {
@@ -87,38 +88,29 @@ private fun encodeNavArg(value: String): String = Uri.encode(value)
 private fun decodeNavArg(value: String?): String? = value?.let(Uri::decode)
 
 @Composable
-fun WearAppRoot(mediaPlayerHandler: MediaPlayerHandler) {
+fun WearAppRoot(mediaPlayerHandler: MediaPlayerHandler, requestedRoute: String? = null, onRouteHandled: () -> Unit = {}) {
     val navController = rememberNavController()
+    LaunchedEffect(requestedRoute) {
+        if (requestedRoute == Routes.NOW_PLAYING || requestedRoute == Routes.DOWNLOADS) {
+            navController.navigate(requestedRoute) { launchSingleTop = true }
+            onRouteHandled()
+        }
+    }
     val context = LocalContext.current
 
     val accountRepository: AccountRepository = remember { GlobalContext.get().get() }
     val commonRepository: CommonRepository = remember { GlobalContext.get().get() }
     val dataStoreManager: DataStoreManager = remember { GlobalContext.get().get() }
     val loggedIn by dataStoreManager.loggedIn.collectAsStateWithLifecycle(initialValue = DataStoreManager.FALSE)
-    var startupGateOpen by remember { mutableStateOf(false) }
+    val startupGateOpen by (context.applicationContext as com.maxrave.simpmusic.wear.WearSimpMusicApplication)
+        .sessionReady.collectAsStateWithLifecycle()
     val didAutoSyncAttempt = remember { AtomicBoolean(false) }
-
-    LaunchedEffect(Unit) {
-        // Short startup gate so account bootstrap can finish before first data queries.
-        delay(1600L)
-        startupGateOpen = true
-    }
-
-    LaunchedEffect(Unit) {
-        runCatching {
-            WearAccountManager(
-                context = context.applicationContext,
-                dataStoreManager = dataStoreManager,
-                accountRepository = accountRepository,
-                commonRepository = commonRepository,
-            ).bootstrapSessionAtStartup()
-        }
-    }
 
     // Best-effort: if the user is not signed in locally, request sync from paired phone once.
     LaunchedEffect(loggedIn, startupGateOpen) {
         if (!startupGateOpen) return@LaunchedEffect
         if (loggedIn == DataStoreManager.TRUE) return@LaunchedEffect
+        if (dataStoreManager.getString(com.maxrave.common.WearCompanionBridge.KEY_WEAR_EXPLICIT_LOGOUT).first() == DataStoreManager.TRUE) return@LaunchedEffect
         if (didAutoSyncAttempt.getAndSet(true)) return@LaunchedEffect
 
         // Give startup restore a brief moment to update DataStore before asking the phone.
@@ -134,20 +126,6 @@ fun WearAppRoot(mediaPlayerHandler: MediaPlayerHandler) {
                     messageClient.sendMessage(node.id, PATH_SYNC_LOGIN_FROM_PHONE, ByteArray(0))
                 }
             }
-    }
-
-    if (!startupGateOpen) {
-        AppScaffold(timeText = { TimeText() }) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                CircularProgressIndicator()
-                Text("Loading session...")
-            }
-        }
-        return
     }
 
     AppScaffold(

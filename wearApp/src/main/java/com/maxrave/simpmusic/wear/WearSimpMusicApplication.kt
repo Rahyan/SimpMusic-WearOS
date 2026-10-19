@@ -11,6 +11,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.CancellationException
 import com.maxrave.logger.Logger
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.GlobalContext
@@ -23,11 +27,18 @@ import org.koin.core.context.startKoin
  * phone-specific crash/restart wiring or UI assumptions.
  */
 class WearSimpMusicApplication : Application() {
+    private val _sessionReady = MutableStateFlow(false)
+    val sessionReady: StateFlow<Boolean> = _sessionReady
     private var networkBinder: ProcessNetworkBinder? = null
+    private var lastPublishedPlayback: Triple<String, String, Boolean>? = null
     private val startupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
+        Logger.configure(java.io.File(filesDir, "diagnostics"), BuildConfig.DEBUG)
+
+        val localMembership = com.maxrave.simpmusic.wear.wearable.WatchLocalMembership(this)
+        com.maxrave.common.LocalLibraryEdits.listener = localMembership::record
 
         // Prefer validated Wi-Fi when available to avoid YouTube signed URL 403s caused by
         // network path/IP mismatch (Wi-Fi vs phone-proxied Bluetooth).
@@ -38,6 +49,25 @@ class WearSimpMusicApplication : Application() {
             loadAllModules()
         }
 
+        startupScope.launch(Dispatchers.Main.immediate) {
+            val handler: com.maxrave.domain.mediaservice.handler.MediaPlayerHandler = GlobalContext.get().get()
+            kotlinx.coroutines.flow.combine(handler.nowPlayingState, handler.controlState) { now, control ->
+                Triple(now.mediaItem.mediaId, now.track?.title ?: now.songEntity?.title.orEmpty(), control.isPlaying)
+            }.collect { state ->
+                if (state != lastPublishedPlayback) {
+                    lastPublishedPlayback = state
+                    try {
+                        androidx.wear.tiles.TileService.getUpdater(this@WearSimpMusicApplication)
+                            .requestUpdate(com.maxrave.simpmusic.wear.tile.SimpMusicTileService::class.java)
+                    } catch (_: SecurityException) { Logger.w("WearSurface", "System denied tile refresh") }
+                    try {
+                        androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester.create(
+                        this@WearSimpMusicApplication, android.content.ComponentName(this@WearSimpMusicApplication,
+                            com.maxrave.simpmusic.wear.complication.PlaybackStatusComplicationService::class.java)).requestUpdateAll()
+                    } catch (_: SecurityException) { Logger.w("WearSurface", "System denied complication refresh") }
+                }
+            }
+        }
         startupScope.launch {
             runCatching {
                 val koin = GlobalContext.get()
@@ -45,15 +75,14 @@ class WearSimpMusicApplication : Application() {
                 val accountRepository: AccountRepository = koin.get()
                 val commonRepository: CommonRepository = koin.get()
 
-                WearAccountManager(
-                    context = applicationContext,
-                    dataStoreManager = dataStoreManager,
-                    accountRepository = accountRepository,
-                    commonRepository = commonRepository,
-                ).bootstrapSessionAtStartup()
+                withTimeout(8_000) {
+                    WearAccountManager(context = applicationContext, dataStoreManager = dataStoreManager,
+                        accountRepository = accountRepository, commonRepository = commonRepository).bootstrapSessionAtStartup()
+                }
             }.onFailure {
-                Logger.e("WearStartup", "Session bootstrap failed: ${it.message}", it)
+                Logger.w("WearStartup", "Account restore unavailable; opening guest library.")
             }
+            _sessionReady.value = true
         }
     }
 

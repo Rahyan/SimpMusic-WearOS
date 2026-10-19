@@ -7,14 +7,11 @@ assignees: ''
 
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+**What are you trying to do?**
+Describe the situation on your watch or phone where the app gets in the way.
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+**What would you like to change?**
+Explain how you'd expect it to work. A rough sketch or example from another app is welcome.
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
-
-**Additional context**
-Add any other context or screenshots about the feature request here.
+**Anything else?**
+Include your watch model if the idea depends on its bezel, screen, storage or other hardware.

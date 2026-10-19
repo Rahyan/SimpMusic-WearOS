@@ -1,0 +1,5 @@
+# Keep executable wrappers usable after a Windows checkout.
+gradlew text eol=lf
+gradlew_ws text eol=lf
+*.sh text eol=lf
+*.bat text eol=crlf

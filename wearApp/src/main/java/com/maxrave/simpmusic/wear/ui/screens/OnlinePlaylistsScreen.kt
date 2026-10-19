@@ -306,7 +306,7 @@ private fun PlaylistRow(
                     shape = RoundedCornerShape(16.dp),
                 ).border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
                     shape = RoundedCornerShape(16.dp),
                 ).padding(horizontal = 10.dp, vertical = 10.dp),
     ) {

@@ -55,7 +55,6 @@ class PlaybackStatusComplicationService : SuspendingComplicationDataSourceServic
             this,
             action.hashCode(),
             Intent(this, WearMainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 .putExtra(SimpMusicTileService.EXTRA_TILE_ACTION, action),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

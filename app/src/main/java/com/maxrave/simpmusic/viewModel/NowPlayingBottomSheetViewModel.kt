@@ -56,6 +56,7 @@ class NowPlayingBottomSheetViewModel(
             ),
         )
     val uiState: StateFlow<NowPlayingBottomSheetUIState> get() = _uiState.asStateFlow()
+    val addToQueueBlock get() = mediaPlayerHandler.addToQueueBlock
 
     private var getSongAsFlow: Job? = null
 
@@ -217,8 +218,9 @@ class NowPlayingBottomSheetViewModel(
                 }
                 is NowPlayingBottomSheetUIEvent.AddToQueue -> {
                     val songEntity = songRepository.getSongById(songUIState.videoId).singleOrNull() ?: return@launch
-                    mediaPlayerHandler.loadMoreCatalog(arrayListOf(songEntity.toTrack()), isAddToQueue = true)
-                    makeToast(getString(R.string.added_to_queue))
+                    if (mediaPlayerHandler.loadMoreCatalog(arrayListOf(songEntity.toTrack()), isAddToQueue = true)) {
+                        makeToast(getString(R.string.added_to_queue))
+                    }
                 }
                 is NowPlayingBottomSheetUIEvent.ChangeLyricsProvider -> {
                     if (listOf(SIMPMUSIC, YOUTUBE, LRCLIB).contains(ev.lyricsProvider)) {

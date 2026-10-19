@@ -124,26 +124,10 @@ fun DiscoverScreen(
 
     WearList(state = listState) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    text = if (loggedIn) "Discover" else "Discover (Guest)",
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = openSearch) {
-                        Icon(Icons.Filled.Search, contentDescription = "Search")
-                    }
-                    IconButton(onClick = openAccounts) {
-                        Icon(Icons.Filled.AccountCircle, contentDescription = "Accounts")
-                    }
-                }
+            com.maxrave.simpmusic.wear.ui.components.WearScreenHeader("Discover", if (loggedIn) "Made for your music" else "Explore as a guest")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                IconButton(onClick = openSearch) { Icon(Icons.Filled.Search, "Search music") }
+                IconButton(onClick = openAccounts) { Icon(Icons.Filled.AccountCircle, "Account and settings") }
             }
         }
 
@@ -167,7 +151,7 @@ fun DiscoverScreen(
             }
         }
 
-        item {
+        if (nowPlayingState.isNotEmpty()) item {
             MiniPlayerHeader(
                 title =
                     nowPlayingState.songEntity?.title
@@ -416,7 +400,7 @@ private fun ContentRow(
                     shape = RoundedCornerShape(16.dp),
                 ).border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
                     shape = RoundedCornerShape(16.dp),
                 ).padding(horizontal = 10.dp, vertical = 10.dp),
     ) {

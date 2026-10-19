@@ -83,6 +83,10 @@ internal class SimpleMediaService :
                 player,
                 simpleMediaSessionCallback,
             )
+        packageManager.getLaunchIntentForPackage(packageName)?.let { launchIntent ->
+            mediaSession?.setSessionActivity(PendingIntent.getActivity(this, 0, launchIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+        }
     }
 
     @UnstableApi

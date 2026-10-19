@@ -12,6 +12,8 @@ interface MediaPlayerListener {
 
     fun onIsPlayingChanged(isPlaying: Boolean)
 
+    fun onSeeked(positionMs: Long) {}
+
     fun onMediaItemTransition(
         mediaItem: GenericMediaItem?,
         reason: Int,

@@ -551,6 +551,8 @@ private fun provideMergingMediaSource(
             coroutineScope,
         ),
         dataStoreManager,
+        context,
+        downloadCache,
     )
 
 @UnstableApi
@@ -620,6 +622,9 @@ private fun provideOkHttpClient(
 
     fun headersForClient(clientId: String?): YouTubeHttpHeaders {
         return when (clientId?.uppercase()) {
+            "VISIONOS" -> YouTubeHttpHeaders(
+                userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+            )
             "IOS" ->
                 YouTubeHttpHeaders(
                     userAgent = "com.google.ios.youtube/19.45.4 (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X;)",
@@ -642,8 +647,13 @@ private fun provideOkHttpClient(
             "TVHTML5" ->
                 YouTubeHttpHeaders(
                     userAgent =
-                        "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/3.0 TV Safari/537.36",
+                        "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/25.lts.30.1034943-gold (unlike Gecko), Unknown_TV_Unknown_0/Unknown (Unknown, Unknown)",
                 )
+            "WEB_EMBEDDED_PLAYER" -> YouTubeHttpHeaders(
+                userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.5 Safari/605.1.15,gzip(gfe)",
+                origin = "https://www.youtube.com",
+                referer = "https://www.youtube.com/",
+            )
 
             "WEB", "WEB_REMIX", "MWEB" ->
                 YouTubeHttpHeaders(
@@ -669,7 +679,9 @@ private fun provideOkHttpClient(
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
-        .callTimeout(90, TimeUnit.SECONDS)
+        // A media response stays open while ExoPlayer pauses reads after buffering.
+        // A total call deadline would kill healthy long tracks; socket stalls remain bounded.
+        .callTimeout(0, TimeUnit.SECONDS)
         // Many YouTube `googlevideo.com/videoplayback` URLs are tied to the client UA (e.g. `c=IOS`).
         // Without a matching UA, playback can 403.
         .addInterceptor { chain ->

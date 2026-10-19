@@ -138,12 +138,6 @@ class NewPipePoTokenProviderImpl(
                 }
             }
 
-        Logger.d(
-            TAG,
-            "poToken for $videoId: playerPot=$playerPot, " +
-                "streamingPot=$streamingPot, visitor_data=$visitorData",
-        )
-
         return PoTokenResult(visitorData, playerPot, streamingPot)
     }
 

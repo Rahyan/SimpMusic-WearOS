@@ -6,6 +6,9 @@ import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import com.google.android.gms.wearable.Node
 import com.google.android.gms.wearable.Wearable
+import com.maxrave.common.BridgeRequests
+import com.maxrave.common.collectionFingerprint
+import com.maxrave.common.nodeSyncKey
 import com.maxrave.common.WearCompanionBridge
 import com.maxrave.domain.data.entities.AlbumEntity
 import com.maxrave.domain.data.entities.PlaylistEntity
@@ -23,7 +26,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import java.security.MessageDigest
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
 import java.util.UUID
@@ -63,199 +65,79 @@ class WatchCompanionAutoSyncWorker(
             return Result.success()
         }
 
-        val node = getConnectedNodes().firstOrNull()
-        if (node == null) {
-            val reason = "Auto-sync skipped: no connected watch."
-            appendLog(reason)
-            persistAutoSyncStats(status = "skipped", reason = reason)
+        val nodes = getConnectedNodes()
+        if (nodes.isEmpty()) {
+            persistAutoSyncStats("skipped", "No connected watch.")
             return Result.success()
         }
-
+        val collections = listOf(
+            SyncCollection("songs", WearCompanionBridge.ACTION_SYNC_SONG, "videoId", songRepository.getLikedSongs().first().map(::songToJson)),
+            SyncCollection("playlists", WearCompanionBridge.ACTION_SYNC_PLAYLIST, "id", playlistRepository.getLikedPlaylists().first().map(::playlistToJson)),
+            SyncCollection("albums", WearCompanionBridge.ACTION_SYNC_ALBUM, "browseId", albumRepository.getLikedAlbums().first().map(::albumToJson)),
+            SyncCollection("artists", WearCompanionBridge.ACTION_SYNC_ARTIST, "channelId", artistRepository.getFollowedArtists().first().map {
+                JSONObject().put("channelId", it.channelId).put("name", it.name).put("thumbnails", it.thumbnails ?: "").put("followed", it.followed)
+            }),
+            SyncCollection("podcasts", WearCompanionBridge.ACTION_SYNC_PODCAST, "podcastId", podcastRepository.getFavoritePodcasts().first().map(::podcastToJson)),
+        )
         var attempted = 0
-        var sent = 0
-        fun counted(result: Boolean) {
-            attempted++
-            if (result) sent++
-        }
-        var changedCategories = 0
-        val categoryStats = linkedMapOf<String, CategorySyncResult>()
-
-        val cookie = dataStoreManager.cookie.first()
-        val loggedIn = dataStoreManager.loggedIn.first() == DataStoreManager.TRUE
-        if (loggedIn && cookie.isNotBlank()) {
-            val payload =
-                JSONObject()
-                    .put("cookie", cookie)
-                    .put("spdc", dataStoreManager.spdc.first())
-                    .put("spotifyClientToken", dataStoreManager.spotifyClientToken.first())
-                    .put("spotifyClientTokenExpires", dataStoreManager.spotifyClientTokenExpires.first())
-                    .put("spotifyPersonalToken", dataStoreManager.spotifyPersonalToken.first())
-                    .put("spotifyPersonalTokenExpires", dataStoreManager.spotifyPersonalTokenExpires.first())
-                    .put("spotifyLyrics", dataStoreManager.spotifyLyrics.first() == DataStoreManager.TRUE)
-                    .put("spotifyCanvas", dataStoreManager.spotifyCanvas.first() == DataStoreManager.TRUE)
-            val sessionSyncResult =
-                syncCategoryIfChanged(
-                    signatureKey = WearCompanionBridge.KEY_AUTO_SYNC_SIG_SESSION,
-                    signature = hashText(payload.toString()),
-                ) {
-                    1 to if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_SESSION, payload)) 1 else 0
-                }
-            categoryStats["session"] = sessionSyncResult
-            changedCategories += if (sessionSyncResult.changed) 1 else 0
-            repeat(sessionSyncResult.attempted) { counted(it < sessionSyncResult.sent) }
-        }
-
-        val likedSongs = songRepository.getLikedSongs().first().take(MAX_SYNC_ITEMS)
-        val songsSyncResult =
-            syncCategoryIfChanged(
-                signatureKey = WearCompanionBridge.KEY_AUTO_SYNC_SIG_SONGS,
-                signature = hashText(likedSongs.joinToString("|") { "${it.videoId}:${it.likeStatus}:${it.downloadState}" }),
-            ) {
-                syncCollection(node.id, WearCompanionBridge.ACTION_SYNC_SONG, likedSongs, ::songToJson)
-            }
-        categoryStats["songs"] = songsSyncResult
-        changedCategories += if (songsSyncResult.changed) 1 else 0
-        repeat(songsSyncResult.attempted) { counted(it < songsSyncResult.sent) }
-
-        val likedPlaylists = playlistRepository.getLikedPlaylists().first().take(MAX_SYNC_ITEMS)
-        val playlistsSyncResult =
-            syncCategoryIfChanged(
-                signatureKey = WearCompanionBridge.KEY_AUTO_SYNC_SIG_PLAYLISTS,
-                signature = hashText(likedPlaylists.joinToString("|") { "${it.id}:${it.liked}:${it.downloadState}" }),
-            ) {
-                syncCollection(node.id, WearCompanionBridge.ACTION_SYNC_PLAYLIST, likedPlaylists, ::playlistToJson)
-            }
-        categoryStats["playlists"] = playlistsSyncResult
-        changedCategories += if (playlistsSyncResult.changed) 1 else 0
-        repeat(playlistsSyncResult.attempted) { counted(it < playlistsSyncResult.sent) }
-
-        val likedAlbums = albumRepository.getLikedAlbums().first().take(MAX_SYNC_ITEMS)
-        val albumsSyncResult =
-            syncCategoryIfChanged(
-                signatureKey = WearCompanionBridge.KEY_AUTO_SYNC_SIG_ALBUMS,
-                signature = hashText(likedAlbums.joinToString("|") { "${it.browseId}:${it.liked}:${it.downloadState}" }),
-            ) {
-                syncCollection(node.id, WearCompanionBridge.ACTION_SYNC_ALBUM, likedAlbums, ::albumToJson)
-            }
-        categoryStats["albums"] = albumsSyncResult
-        changedCategories += if (albumsSyncResult.changed) 1 else 0
-        repeat(albumsSyncResult.attempted) { counted(it < albumsSyncResult.sent) }
-
-        val followedArtists = artistRepository.getFollowedArtists().first().take(MAX_SYNC_ITEMS)
-        val artistsSyncResult =
-            syncCategoryIfChanged(
-                signatureKey = WearCompanionBridge.KEY_AUTO_SYNC_SIG_ARTISTS,
-                signature = hashText(followedArtists.joinToString("|") { "${it.channelId}:${it.followed}" }),
-            ) {
-                val payloads =
-                    followedArtists.map { artist ->
-                        JSONObject()
-                            .put("channelId", artist.channelId)
-                            .put("name", artist.name)
-                            .put("thumbnails", artist.thumbnails ?: "")
-                            .put("followed", artist.followed)
+        var applied = 0
+        var changed = 0
+        var failed = false
+        var pendingPages = false
+        val stats = linkedMapOf<String, CategorySyncResult>()
+        for (node in nodes) {
+            val status = requestAction(node.id, WearCompanionBridge.ACTION_STATUS, JSONObject())
+            val capabilities = status?.data?.let { runCatching { JSONObject(it) }.getOrNull() }
+            val generation = capabilities?.optString("libraryGeneration").orEmpty()
+            if (status?.ok != true || generation.isBlank()) { failed = true; continue }
+            // Session refresh is intentionally explicit. A background library job must not undo watch logout.
+            for (collection in collections) {
+                val all = collection.payloads.sortedBy { it.optString(collection.idField) }
+                val signature = collectionFingerprint(all)
+                val key = nodeSyncKey(collection.category, node.id + ":" + generation)
+                if (dataStoreManager.getString(key).first() == signature) continue
+                val cursor = dataStoreManager.getString("${key}_cursor").first().orEmpty().split(":")
+                val offset = if (cursor.firstOrNull() == signature) cursor.getOrNull(1)?.toIntOrNull()?.coerceIn(0, all.size) ?: 0 else 0
+                val payloads = all.drop(offset).take(MAX_SYNC_ITEMS)
+                val nextOffset = offset + payloads.size
+                val complete = nextOffset == all.size
+                changed++
+                var count = 0
+                var success = true
+                for (payload in payloads) {
+                    attempted++; count++
+                    if (sendActionToNode(node.id, collection.action, payload)) applied++ else {
+                        success = false; break // Stop a disconnected watch from consuming the entire worker budget.
                     }
-                syncJsonPayloadCollection(node.id, WearCompanionBridge.ACTION_SYNC_ARTIST, payloads)
-            }
-        categoryStats["artists"] = artistsSyncResult
-        changedCategories += if (artistsSyncResult.changed) 1 else 0
-        repeat(artistsSyncResult.attempted) { counted(it < artistsSyncResult.sent) }
-
-        val favoritePodcasts = podcastRepository.getFavoritePodcasts().first().take(MAX_SYNC_ITEMS)
-        val podcastsSyncResult =
-            syncCategoryIfChanged(
-                signatureKey = WearCompanionBridge.KEY_AUTO_SYNC_SIG_PODCASTS,
-                signature = hashText(favoritePodcasts.joinToString("|") { "${it.podcastId}:${it.isFavorite}" }),
-            ) {
-                syncCollection(node.id, WearCompanionBridge.ACTION_SYNC_PODCAST, favoritePodcasts, ::podcastToJson)
-            }
-        categoryStats["podcasts"] = podcastsSyncResult
-        changedCategories += if (podcastsSyncResult.changed) 1 else 0
-        repeat(podcastsSyncResult.attempted) { counted(it < podcastsSyncResult.sent) }
-
-        val downloadPayload = buildDownloadPayload()
-        val downloadSyncResult =
-            syncCategoryIfChanged(
-                signatureKey = WearCompanionBridge.KEY_AUTO_SYNC_SIG_DOWNLOADS,
-                signature = hashText(downloadPayload.toString()),
-            ) {
-                1 to if (sendActionToNode(node.id, WearCompanionBridge.ACTION_SYNC_DOWNLOAD, downloadPayload)) 1 else 0
-            }
-        categoryStats["downloads"] = downloadSyncResult
-        changedCategories += if (downloadSyncResult.changed) 1 else 0
-        repeat(downloadSyncResult.attempted) { counted(it < downloadSyncResult.sent) }
-
-        appendLog("Auto-sync delta changed $changedCategories categories, delivered $sent/$attempted payloads.")
-        persistAutoSyncStats(
-            status =
-                when {
-                    attempted == 0 -> "noop"
-                    sent == attempted -> "success"
-                    sent == 0 -> "retry"
-                    else -> "partial"
-                },
-            reason = "",
-            attempted = attempted,
-            sent = sent,
-            changedCategories = changedCategories,
-            categoryStats = categoryStats,
-        )
-        return when {
-            attempted == 0 -> Result.success()
-            sent == attempted -> Result.success()
-            sent == 0 -> Result.retry()
-            else -> Result.retry()
-        }
-    }
-
-    private suspend fun <T> syncCollection(
-        nodeId: String,
-        action: String,
-        items: List<T>,
-        mapper: (T) -> JSONObject,
-    ): Pair<Int, Int> {
-        val payloads = items.map(mapper)
-        return syncJsonPayloadCollection(nodeId, action, payloads)
-    }
-
-    private suspend fun syncJsonPayloadCollection(
-        nodeId: String,
-        action: String,
-        payloads: List<JSONObject>,
-    ): Pair<Int, Int> {
-        var attempted = 0
-        var sent = 0
-        payloads.forEach { payload ->
-            attempted++
-            if (sendActionToNode(nodeId, action, payload)) {
-                sent++
+                }
+                if (success) {
+                    attempted++; count++
+                    val manifest = JSONObject().put("category", collection.category)
+                        .put("complete", complete).put("revision", signature).put("offset", offset)
+                        .put("ids", JSONArray(payloads.map { it.getString(collection.idField) }))
+                    success = sendActionToNode(node.id, WearCompanionBridge.ACTION_RECONCILE, manifest)
+                    if (success) applied++
+                }
+                if (success) {
+                    if (complete) {
+                        dataStoreManager.putString(key, signature)
+                        dataStoreManager.putString("${key}_cursor", "")
+                    } else {
+                        dataStoreManager.putString("${key}_cursor", "$signature:$nextOffset")
+                        pendingPages = true
+                    }
+                } else failed = true
+                stats[nodeSyncKey(collection.category, node.id)] = CategorySyncResult(count, count - if (success) 0 else 1, true)
+                if (!success) break
             }
         }
-        return attempted to sent
+        appendLog("Auto-sync: watch confirmed $applied/$attempted requests across ${nodes.size} watch(es).")
+        persistAutoSyncStats(if (failed || pendingPages) "retry" else if (attempted == 0) "noop" else "success", "",
+            attempted, applied, changed, stats)
+        return if (failed || pendingPages) Result.retry() else Result.success()
     }
 
-    private suspend fun syncCategoryIfChanged(
-        signatureKey: String,
-        signature: String,
-        sync: suspend () -> Pair<Int, Int>,
-    ): CategorySyncResult {
-        val previous = dataStoreManager.getString(signatureKey).first().orEmpty()
-        if (previous == signature) return CategorySyncResult()
-        val (attempted, sent) = sync()
-        if (attempted == sent) {
-            dataStoreManager.putString(signatureKey, signature)
-        }
-        return CategorySyncResult(
-            attempted = attempted,
-            sent = sent,
-            changed = true,
-        )
-    }
-
-    private fun hashText(value: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
-        return digest.joinToString(separator = "") { byte -> "%02x".format(byte) }
-    }
+    private data class SyncCollection(val category: String, val action: String, val idField: String, val payloads: List<JSONObject>)
 
     private fun isDeviceCharging(): Boolean {
         val batteryManager = applicationContext.getSystemService(BatteryManager::class.java) ?: return false
@@ -285,23 +167,19 @@ class WatchCompanionAutoSyncWorker(
         nodeId: String,
         action: String,
         payload: JSONObject,
-    ): Boolean {
-        val body =
-            JSONObject()
-                .put("requestId", UUID.randomUUID().toString())
-                .put("action", action)
-                .put("payload", payload)
-                .toString()
-                .toByteArray(Charsets.UTF_8)
-        return suspendCancellableCoroutine { continuation ->
-            Wearable
-                .getMessageClient(applicationContext)
-                .sendMessage(nodeId, WearCompanionBridge.PATH_REQUEST, body)
-                .addOnSuccessListener {
-                    if (continuation.isActive) continuation.resume(true)
-                }.addOnFailureListener {
-                    if (continuation.isActive) continuation.resume(false)
-                }
+    ): Boolean = requestAction(nodeId, action, payload)?.ok == true
+
+    private suspend fun requestAction(nodeId: String, action: String, payload: JSONObject): com.maxrave.common.BridgeAcknowledgement? {
+        val requestId = UUID.randomUUID().toString()
+        val body = JSONObject().put("protocolVersion", WearCompanionBridge.PROTOCOL_VERSION)
+            .put("requestId", requestId).put("action", action).put("payload", payload).toString().toByteArray(Charsets.UTF_8)
+        if (body.size > 100_000) return null
+        return BridgeRequests.sendAndAwait(nodeId, requestId, action) {
+            suspendCancellableCoroutine { continuation ->
+                Wearable.getMessageClient(applicationContext).sendMessage(nodeId, WearCompanionBridge.PATH_REQUEST, body)
+                    .addOnSuccessListener { if (continuation.isActive) continuation.resume(true) }
+                    .addOnFailureListener { if (continuation.isActive) continuation.resume(false) }
+            }
         }
     }
 
@@ -368,7 +246,6 @@ class WatchCompanionAutoSyncWorker(
             .put("category", song.category ?: "")
             .put("resultType", song.resultType ?: "")
             .put("liked", song.liked)
-            .put("downloadState", song.downloadState)
 
     private fun playlistToJson(playlist: PlaylistEntity): JSONObject =
         JSONObject()
@@ -384,7 +261,6 @@ class WatchCompanionAutoSyncWorker(
             .put("tracks", JSONArray(playlist.tracks ?: emptyList<String>()))
             .put("year", playlist.year ?: "")
             .put("liked", playlist.liked)
-            .put("downloadState", playlist.downloadState)
 
     private fun albumToJson(album: AlbumEntity): JSONObject =
         JSONObject()
@@ -402,7 +278,6 @@ class WatchCompanionAutoSyncWorker(
             .put("type", album.type)
             .put("year", album.year ?: "")
             .put("liked", album.liked)
-            .put("downloadState", album.downloadState)
 
     private fun podcastToJson(podcast: PodcastsEntity): JSONObject =
         JSONObject()
@@ -415,35 +290,6 @@ class WatchCompanionAutoSyncWorker(
             .put("thumbnail", podcast.thumbnail ?: "")
             .put("isFavorite", podcast.isFavorite)
             .put("listEpisodes", JSONArray(podcast.listEpisodes))
-
-    private suspend fun buildDownloadPayload(): JSONObject {
-        val downloadedSongs =
-            (songRepository.getDownloadedSongs().first().orEmpty() + songRepository.getDownloadingSongs().first().orEmpty())
-                .distinctBy { it.videoId }
-        val downloadedCollections =
-            (playlistRepository.getAllDownloadedPlaylist().first() + playlistRepository.getAllDownloadingPlaylist().first())
-                .distinctBy { it.toString() }
-
-        val playlistStates = JSONArray()
-        val albumStates = JSONArray()
-        downloadedCollections.forEach { item ->
-            when (item) {
-                is PlaylistEntity -> playlistStates.put(JSONObject().put("id", item.id).put("downloadState", item.downloadState))
-                is AlbumEntity -> albumStates.put(JSONObject().put("browseId", item.browseId).put("downloadState", item.downloadState))
-                else -> Unit
-            }
-        }
-
-        val songStates = JSONArray()
-        downloadedSongs.forEach { song ->
-            songStates.put(JSONObject().put("videoId", song.videoId).put("downloadState", song.downloadState))
-        }
-
-        return JSONObject()
-            .put("songs", songStates)
-            .put("playlists", playlistStates)
-            .put("albums", albumStates)
-    }
 
     companion object {
         private const val MAX_SYNC_ITEMS = 60

@@ -23,6 +23,7 @@ import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import com.maxrave.domain.repository.ArtistRepository
 import com.maxrave.simpmusic.wear.ui.components.WearEmptyState
+import com.maxrave.simpmusic.wear.ui.components.WearScreenHeader
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import org.koin.core.context.GlobalContext
 
@@ -37,23 +38,7 @@ fun FollowedArtistsScreen(
     val followedArtists = remember(artists) { artists.filter { it.channelId.isNotBlank() } }
 
     WearList(state = listState) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Followed artists",
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
+        item { WearScreenHeader("Followed artists", onBack = onBack) }
 
         if (followedArtists.isEmpty()) {
             item {

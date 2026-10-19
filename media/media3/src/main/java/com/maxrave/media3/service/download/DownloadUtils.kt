@@ -31,6 +31,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.lastOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -135,8 +136,13 @@ internal class DownloadUtils(
             dataSourceFactory,
             Executor(Runnable::run),
         ).apply {
-            maxParallelDownloads = 20
+            maxParallelDownloads = if (context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_WATCH)) 2 else 20
             minRetryCount = 3
+            if (context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_WATCH) &&
+                context.getSharedPreferences("watch_download_policy", Context.MODE_PRIVATE).getBoolean("charging", false)) {
+                setRequirements(androidx.media3.exoplayer.scheduler.Requirements(
+                    androidx.media3.exoplayer.scheduler.Requirements.NETWORK_UNMETERED or androidx.media3.exoplayer.scheduler.Requirements.DEVICE_CHARGING))
+            }
             addListener(
                 MusicDownloadService.TerminalStateNotificationHelper(
                     context = context,
@@ -161,17 +167,16 @@ internal class DownloadUtils(
         videoId: String,
         title: String,
         thumbnail: String,
+        audioOnly: Boolean,
     ) {
         var isVideo = false
-        val request =
-            ImageRequest
-                .Builder(context)
-                .data(thumbnail)
-                .diskCachePolicy(CachePolicy.ENABLED)
-                .build()
-        val imageResult = ImageLoader(context).execute(request)
-        if (imageResult.image?.height != imageResult.image?.width && imageResult.image != null) {
-            isVideo = true
+        if (!audioOnly && dataStoreManager.watchVideoInsteadOfPlayingAudio.first() == DataStoreManager.TRUE) {
+            val request = ImageRequest.Builder(context).data(thumbnail).diskCachePolicy(CachePolicy.ENABLED).build()
+            val loader = ImageLoader(context)
+            try {
+                val image = loader.execute(request).image
+                isVideo = image != null && image.height != image.width
+            } finally { loader.shutdown() }
         }
         val downloadRequest =
             DownloadRequest
@@ -183,7 +188,7 @@ internal class DownloadUtils(
             context,
             MusicDownloadService::class.java,
             downloadRequest,
-            false,
+            audioOnly && context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_WATCH),
         )
         if (isVideo) {
             val id = MERGING_DATA_TYPE.VIDEO + videoId
@@ -199,6 +204,32 @@ internal class DownloadUtils(
                 downloadRequestVideo,
                 false,
             )
+        }
+    }
+
+    override suspend fun completedAudioIds(): Set<String> = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        val ready = mutableSetOf<String>()
+        downloadManager.downloadIndex.getDownloads(Download.STATE_COMPLETED).use { cursor ->
+            while (cursor.moveToNext()) {
+                val download = cursor.download
+                if (download.request.id.startsWith(MERGING_DATA_TYPE.VIDEO)) continue
+                val length = if (download.contentLength > 0) download.contentLength else download.bytesDownloaded
+                val key = download.request.customCacheKey ?: download.request.id
+                if (length > 0 && downloadCache.isCached(key, 0, length)) ready.add(download.request.id)
+            }
+        }
+        ready
+    }
+
+    override suspend fun setWatchDownloadPolicy(chargingOnly: Boolean) {
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            check(context.getSharedPreferences("watch_download_policy", Context.MODE_PRIVATE)
+                .edit().putBoolean("charging", chargingOnly).commit())
+        }
+        kotlinx.coroutines.withContext(Dispatchers.Main.immediate) {
+            val flags = if (chargingOnly) androidx.media3.exoplayer.scheduler.Requirements.NETWORK_UNMETERED or
+                androidx.media3.exoplayer.scheduler.Requirements.DEVICE_CHARGING else androidx.media3.exoplayer.scheduler.Requirements.NETWORK
+            downloadManager.setRequirements(androidx.media3.exoplayer.scheduler.Requirements(flags))
         }
     }
 

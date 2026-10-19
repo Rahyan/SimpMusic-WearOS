@@ -48,6 +48,7 @@ import com.maxrave.domain.utils.Resource
 import com.maxrave.domain.utils.toTrack
 import com.maxrave.simpmusic.wear.ui.components.WearEmptyState
 import com.maxrave.simpmusic.wear.ui.components.WearErrorState
+import com.maxrave.simpmusic.wear.ui.components.WearScreenHeader
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import com.maxrave.simpmusic.wear.ui.components.WearLoadingState
 import com.maxrave.simpmusic.wear.ui.util.friendlyNetworkError
@@ -245,26 +246,7 @@ fun SearchScreen(
     val allPlaylists = (playlistResults + featuredPlaylists).distinctBy { it.browseId }
 
     WearList(state = listState) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Search",
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                IconButton(onClick = { openWearKeyboard() }) {
-                    Icon(Icons.Filled.Search, contentDescription = "Open keyboard")
-                }
-            }
-        }
+        item { WearScreenHeader("Search", onBack = onBack) }
 
         item {
             FilledTonalButton(
@@ -557,7 +539,7 @@ private fun TrackRow(
                     shape = RoundedCornerShape(16.dp),
                 ).border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
                     shape = RoundedCornerShape(16.dp),
                 ).padding(horizontal = 10.dp, vertical = 10.dp),
     ) {

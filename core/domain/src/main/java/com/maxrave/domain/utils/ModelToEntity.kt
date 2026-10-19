@@ -101,7 +101,7 @@ fun Track.toSongEntity(): SongEntity {
         isExplicit = this.isExplicit,
         likeStatus = this.likeStatus ?: "",
         thumbnails =
-            this.thumbnails?.last()?.url?.let {
+            this.thumbnails?.lastOrNull()?.url?.let {
                 if (it.contains("w120")) {
                     return@let Regex("([wh])120").replace(it, "$1544")
                 } else if (it.contains("sddefault")) {
@@ -254,7 +254,7 @@ fun AlbumBrowse.toAlbumEntity(id: String): AlbumEntity =
         description = this.description ?: "",
         duration = this.duration,
         durationSeconds = this.durationSeconds,
-        thumbnails = this.thumbnails?.last()?.url,
+        thumbnails = this.thumbnails?.lastOrNull()?.url,
         title = this.title,
         trackCount = this.trackCount,
         tracks = this.tracks.toListVideoId(),

@@ -37,6 +37,7 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -44,9 +45,11 @@ android {
     room {
         schemaDirectory("$projectDir/schemas")
     }
+    sourceSets.getByName("androidTest").assets.srcDir("schemas")
 }
 
 dependencies {
+    coreLibraryDesugaring(libs.desugaring)
     implementation(project(":common"))
     implementation(project(":domain"))
     implementation(project(":kotlinYtmusicScraper"))
@@ -72,6 +75,10 @@ dependencies {
 
     // Media3
     implementation(project(":media3"))
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.material)
+    androidTestImplementation(project(":j2v8"))
 }
 tasks.withType<CompileArtProfileTask> {
     enabled = false

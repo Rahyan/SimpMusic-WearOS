@@ -257,12 +257,8 @@ internal class StreamRepositoryImpl(
                             else -> 4_000L
                         }
                     var fallbackUnchecked: PlayerResponse.StreamingData.Format? = null
-                    var fallbackAny: PlayerResponse.StreamingData.Format? = null
 
                     for ((index, candidate) in rankedCandidates.withIndex()) {
-                        if (fallbackAny == null) {
-                            fallbackAny = candidate
-                        }
                         if (index >= maxChecks) {
                             if (fallbackUnchecked == null && !isPoisonedCandidate(candidate)) {
                                 fallbackUnchecked = candidate
@@ -304,15 +300,6 @@ internal class StreamRepositoryImpl(
                             "All checked audio candidates blocked, trying unchecked itag=${fallbackUnchecked?.itag}",
                         )
                         return fallbackUnchecked
-                    }
-
-                    if (fallbackAny != null) {
-                        Logger.w(
-                            "Stream",
-                            "Forcing retry with least-penalized audio candidate itag=${fallbackAny?.itag}",
-                        )
-                        StreamHealthRegistry.markUrlHealthy(fallbackAny?.url)
-                        return fallbackAny
                     }
 
                     Logger.w("Stream", "No playable audio candidate found")

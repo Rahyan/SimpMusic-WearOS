@@ -11,6 +11,8 @@ import com.google.android.gms.wearable.WearableListenerService
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.maxrave.common.Config
+import com.maxrave.common.BridgeRequests
+import com.maxrave.common.BridgeAcknowledgement
 import com.maxrave.common.WearCompanionBridge
 import com.maxrave.domain.data.model.browse.album.Track
 import com.maxrave.domain.data.model.searchResult.songs.Album
@@ -42,6 +44,11 @@ private const val NOTIFICATION_ID = 0x534D4C // "SML"
 
 class WearDataLayerListenerService : WearableListenerService() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun onDestroy() {
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        super.onDestroy()
+    }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
         when (messageEvent.path) {
@@ -249,7 +256,10 @@ class WearDataLayerListenerService : WearableListenerService() {
 
     private fun onCompanionResponse(messageEvent: MessageEvent) {
         val payload = runCatching { messageEvent.data.decodeToString() }.getOrNull().orEmpty()
-        if (payload.isBlank()) return
+        if (payload.isBlank() || payload.length > 100_000) return
+        val reply = runCatching { JSONObject(payload) }.getOrNull() ?: return
+        BridgeRequests.complete(messageEvent.sourceNodeId, reply.optString("requestId"), reply.optString("action"),
+            BridgeAcknowledgement(reply.optBoolean("ok"), reply.optString("message"), reply.optJSONObject("data")?.toString()))
         scope.launch {
             val dataStoreManager = runCatching { GlobalContext.get().get<DataStoreManager>() }.getOrNull() ?: return@launch
             dataStoreManager.putString(WearCompanionBridge.KEY_LAST_RESPONSE, payload)

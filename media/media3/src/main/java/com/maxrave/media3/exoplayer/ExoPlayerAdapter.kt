@@ -35,6 +35,21 @@ class ExoPlayerAdapter(
         exoPlayer.addListener(exoPlayerListener)
     }
 
+    private val pinnedNext = mutableSetOf<Int>()
+    private fun shuffleOrder(): List<Int> {
+        val timeline = exoPlayer.currentTimeline
+        val order = mutableListOf<Int>()
+        var index = timeline.getFirstWindowIndex(true)
+        while (index != androidx.media3.common.C.INDEX_UNSET && order.size < exoPlayer.mediaItemCount) {
+            order.add(index)
+            index = timeline.getNextWindowIndex(index, Player.REPEAT_MODE_OFF, true)
+        }
+        return order
+    }
+    private fun installOrder(order: List<Int>) {
+        exoPlayer.setShuffleOrder(androidx.media3.exoplayer.source.ShuffleOrder.DefaultShuffleOrder(order.toIntArray(), kotlin.random.Random.nextLong()))
+    }
+
     // Playback control
     override fun play() = exoPlayer.play()
 
@@ -61,28 +76,50 @@ class ExoPlayerAdapter(
 
     // Media item management
     override fun setMediaItem(mediaItem: GenericMediaItem) {
+        pinnedNext.clear()
         exoPlayer.setMediaItem(mediaItem.toMedia3MediaItem())
     }
 
-    override fun addMediaItem(mediaItem: GenericMediaItem) {
-        exoPlayer.addMediaItem(mediaItem.toMedia3MediaItem())
-    }
+    override fun addMediaItem(mediaItem: GenericMediaItem) = insertItem(exoPlayer.mediaItemCount, mediaItem, false)
 
-    override fun addMediaItem(
-        index: Int,
-        mediaItem: GenericMediaItem,
-    ) {
+    override fun addMediaItem(index: Int, mediaItem: GenericMediaItem) = insertItem(index, mediaItem, index == exoPlayer.currentMediaItemIndex + 1)
+
+    private fun insertItem(index: Int, mediaItem: GenericMediaItem, playNext: Boolean) {
+        val shuffled = exoPlayer.shuffleModeEnabled
+        val current = exoPlayer.currentMediaItemIndex
+        val order = if (shuffled) com.maxrave.common.insertShuffledTrack(shuffleOrder(), index, current, pinnedNext, kotlin.random.Random, playNext) else null
+        val updatedPins = pinnedNext.map { if (it >= index) it + 1 else it }.toSet()
         exoPlayer.addMediaItem(index, mediaItem.toMedia3MediaItem())
+        pinnedNext.clear(); pinnedNext.addAll(updatedPins)
+        if (shuffled && current >= 0 && playNext) pinnedNext.add(index)
+        if (order != null) installOrder(order)
     }
 
-    override fun removeMediaItem(index: Int) = exoPlayer.removeMediaItem(index)
+    override fun removeMediaItem(index: Int) {
+        val updatedPins = pinnedNext.filter { it != index }.map { if (it > index) it - 1 else it }
+        exoPlayer.removeMediaItem(index)
+        pinnedNext.clear(); pinnedNext.addAll(updatedPins)
+    }
 
-    override fun moveMediaItem(
-        fromIndex: Int,
-        toIndex: Int,
-    ) = exoPlayer.moveMediaItem(fromIndex, toIndex)
+    override fun removeMediaItems(fromIndex: Int, toIndex: Int) {
+        val count = toIndex - fromIndex
+        val order = if (exoPlayer.shuffleModeEnabled) shuffleOrder().filter { it !in fromIndex until toIndex }
+            .map { if (it >= toIndex) it - count else it } else null
+        val pins = pinnedNext.filter { it !in fromIndex until toIndex }.map { if (it >= toIndex) it - count else it }
+        exoPlayer.removeMediaItems(fromIndex, toIndex)
+        pinnedNext.clear(); pinnedNext.addAll(pins)
+        if (order != null) installOrder(order)
+    }
 
-    override fun clearMediaItems() = exoPlayer.clearMediaItems()
+    override fun moveMediaItem(fromIndex: Int, toIndex: Int) {
+        val order = if (exoPlayer.shuffleModeEnabled) com.maxrave.common.moveShuffledTrack(shuffleOrder(), fromIndex, toIndex) else null
+        val updatedPins = pinnedNext.map { com.maxrave.common.movedPlaylistIndex(it, fromIndex, toIndex) }
+        exoPlayer.moveMediaItem(fromIndex, toIndex)
+        pinnedNext.clear(); pinnedNext.addAll(updatedPins)
+        if (order != null) installOrder(order)
+    }
+
+    override fun clearMediaItems() { pinnedNext.clear(); exoPlayer.clearMediaItems() }
 
     override fun replaceMediaItem(
         index: Int,
@@ -114,6 +151,7 @@ class ExoPlayerAdapter(
     override var shuffleModeEnabled: Boolean
         get() = exoPlayer.shuffleModeEnabled
         set(value) {
+            pinnedNext.clear()
             exoPlayer.shuffleModeEnabled = value
         }
 
@@ -186,6 +224,12 @@ class ExoPlayerAdapter(
             listeners.forEach { it.onPlaybackStateChanged(domainState) }
         }
 
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+            if (reason == Player.DISCONTINUITY_REASON_SEEK || reason == Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT) {
+                listeners.forEach { it.onSeeked(newPosition.positionMs) }
+            }
+        }
+
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             listeners.forEach { it.onIsPlayingChanged(isPlaying) }
         }
@@ -194,6 +238,7 @@ class ExoPlayerAdapter(
             mediaItem: MediaItem?,
             reason: Int,
         ) {
+            pinnedNext.remove(exoPlayer.currentMediaItemIndex)
             val genericMediaItem = mediaItem?.toGenericMediaItem()
             val domainReason =
                 when (reason) {

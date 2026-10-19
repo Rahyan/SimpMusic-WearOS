@@ -88,11 +88,12 @@ internal class PlaylistRepositoryImpl(
     override suspend fun updatePlaylistLiked(
         playlistId: String,
         likeStatus: Int,
-    ) = withContext(Dispatchers.Main) {
+    ) = withContext(Dispatchers.IO) {
         localDataSource.updatePlaylistLiked(
             likeStatus,
             playlistId,
         )
+        com.maxrave.common.LocalLibraryEdits.changed("playlists", playlistId, likeStatus == 1)
     }
 
     override suspend fun updatePlaylistInLibrary(

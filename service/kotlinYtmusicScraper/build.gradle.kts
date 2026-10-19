@@ -65,6 +65,8 @@ dependencies {
     implementation(libs.androidx.ui.text.android)
     implementation(libs.androidx.webkit)
     testImplementation(libs.junit)
+    testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.okhttp3.dnsoverhttps)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.espresso.core)
 
@@ -74,6 +76,8 @@ dependencies {
     implementation(libs.ktor.client.cio)
     implementation(libs.ktor.client.encoding)
     implementation(libs.ktor.client.okhttp)
+    // The vendored provider requests older DNS/Brotli modules; align their OkHttp internals.
+    implementation(platform(libs.okhttp3.bom))
     implementation(libs.ktor.client.logging)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.client.content.negotiation)
@@ -91,10 +95,11 @@ dependencies {
 
     implementation(project(mapOf("path" to ":youtubeapi")))
     implementation(project(mapOf("path" to ":sharedutils")))
-    implementation(libs.ffmpeg.kit.audio)
-    implementation(libs.newpipe.extractor)
+    implementation(libs.newpipe.extractor) {
+        // NewPipe calls Rhino's interpreter directly; Android has no javax.script engine API.
+        exclude(group = "org.mozilla", module = "rhino-engine")
+    }
 
-    implementation(libs.ytdlp.android)
 }
 tasks.withType<CompileArtProfileTask> {
     enabled = false

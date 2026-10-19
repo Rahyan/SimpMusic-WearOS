@@ -2,13 +2,9 @@ package com.maxrave.simpmusic.wear.ui.screens
 
 import android.content.Context
 import android.media.AudioManager
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.*
+import com.maxrave.simpmusic.wear.ui.components.rotaryVolume
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.runtime.Composable
@@ -21,14 +17,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import com.maxrave.simpmusic.wear.ui.components.ThinProgressBar
-import com.maxrave.simpmusic.wear.ui.components.WearList
+import com.maxrave.simpmusic.wear.ui.components.WearScreenHeader
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 @Composable
 fun VolumeScreen(onBack: () -> Unit) {
@@ -52,82 +51,38 @@ fun VolumeScreen(onBack: () -> Unit) {
     fun setVolume(target: Int) {
         val clamped = target.coerceIn(0, maxVolume)
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, clamped, 0)
-        currentVolume = clamped
+        syncVolume()
     }
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(800L)
-            syncVolume()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                syncVolume()
+                delay(800L)
+            }
         }
     }
 
     val fraction = currentVolume.toFloat() / maxVolume.toFloat()
-    val percent = (fraction * 100f).toInt().coerceIn(0, 100)
+    val percent = (fraction * 100f).roundToInt().coerceIn(0, 100)
 
-    WearList {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Volume",
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f),
-                )
+    Column(Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 28.dp).rotaryVolume(onVolumeChanged = { current, maximum ->
+        currentVolume = current; maxVolume = maximum
+    }),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceEvenly) {
+        WearScreenHeader("Volume", onBack = onBack)
+        Text("$percent%", style = MaterialTheme.typography.titleLarge)
+        ThinProgressBar(fraction)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            IconButton({ setVolume(currentVolume - 1) }, Modifier.size(48.dp), enabled = currentVolume > 0) {
+                Icon(Icons.Filled.Remove, "Volume down")
+            }
+            IconButton({ setVolume(currentVolume + 1) }, Modifier.size(48.dp), enabled = currentVolume < maxVolume) {
+                Icon(Icons.Filled.Add, "Volume up")
             }
         }
-
-        item { Spacer(Modifier.height(8.dp)) }
-
-        item {
-            Text(
-                text = "$percent%",
-                style = MaterialTheme.typography.titleLarge,
-            )
-        }
-
-        item {
-            ThinProgressBar(progress = fraction)
-        }
-
-        item { Spacer(Modifier.height(6.dp)) }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(
-                    onClick = { setVolume(currentVolume - 1) },
-                    enabled = currentVolume > 0,
-                ) {
-                    Icon(Icons.Filled.Remove, contentDescription = "Volume down")
-                }
-                IconButton(
-                    onClick = { setVolume(currentVolume + 1) },
-                    enabled = currentVolume < maxVolume,
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = "Volume up")
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(6.dp)) }
-
-        item {
-            FilledTonalButton(
-                onClick = { setVolume(maxVolume) },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = currentVolume < maxVolume,
-            ) {
-                Text("Max volume")
-            }
-        }
+        Text("Turn the bezel to adjust", style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

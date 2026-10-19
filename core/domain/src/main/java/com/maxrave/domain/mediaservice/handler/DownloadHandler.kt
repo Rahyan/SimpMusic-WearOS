@@ -7,7 +7,12 @@ interface DownloadHandler {
         videoId: String,
         title: String,
         thumbnail: String,
+        audioOnly: Boolean = false,
     )
+
+    /** Verify completed audio against the actual cache, not imported song metadata. */
+    suspend fun completedAudioIds(): Set<String>
+    suspend fun setWatchDownloadPolicy(chargingOnly: Boolean)
 
     fun removeDownload(videoId: String)
 

@@ -1,30 +1,30 @@
 ---
 name: Bug report
-about: Create a report to help us improve
+about: Something isn't working on the watch or phone
 title: ''
 labels: 'bug:unconfirmed'
 assignees: ''
 
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+**What happened?**
+Include what you expected to happen instead.
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+**How can I reproduce it?**
+Steps from opening the app. If one track or playlist causes it, include its link.
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+**Devices and build**
+- Watch model and Wear OS version:
+- Phone model and Android version:
+- App version or commit:
+- Phone app: lightweight companion or full SimpMusic:
 
-**App Version**
-The version number of SimpMusic which is installed.
+**For playback or connection problems**
+- Playing on the watch or phone:
+- Streaming or downloaded music:
+- Guest or signed in:
+- Wi-Fi, Bluetooth proxy, or disconnected:
+- Speaker or Bluetooth headphones:
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
-
-**Log (Error Details)**
-Paste the log from the crashing screen, if it is not a crash bug, skip it.
+**Screenshots or logs**
+Attach anything that helps show the problem. Remove cookies, tokens and account details before posting logs. Do not attach session exports or account databases.

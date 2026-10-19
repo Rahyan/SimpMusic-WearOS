@@ -20,6 +20,8 @@ internal class ArtistRepositoryImpl(
     private val localDataSource: LocalDataSource,
     private val youTube: YouTube,
 ) : ArtistRepository {
+    override suspend fun updateArtistMetadata(item: ArtistEntity) = withContext(Dispatchers.IO) { localDataSource.updateArtistMetadata(item) }
+
     override fun getAllArtists(limit: Int): Flow<List<ArtistEntity>> =
         flow {
             emit(localDataSource.getAllArtists(limit))
@@ -51,8 +53,8 @@ internal class ArtistRepositoryImpl(
         channelId: String,
         followedStatus: Int,
     ) = withContext(
-        Dispatchers.Main,
-    ) { localDataSource.updateFollowed(followedStatus, channelId) }
+        Dispatchers.IO,
+    ) { localDataSource.updateFollowed(followedStatus, channelId); com.maxrave.common.LocalLibraryEdits.changed("artists", channelId, followedStatus == 1) }
 
     override fun getFollowedArtists(): Flow<List<ArtistEntity>> =
         flow {

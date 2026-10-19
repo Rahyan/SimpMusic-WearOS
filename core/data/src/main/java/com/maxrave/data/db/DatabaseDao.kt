@@ -35,6 +35,29 @@ import java.time.LocalDateTime
 
 @Dao
 internal interface DatabaseDao {
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertPodcastIfAbsent(podcast: PodcastsEntity): Long
+
+    @Transaction
+    suspend fun upsertPodcastMetadata(podcast: PodcastsEntity) {
+        insertPodcastIfAbsent(podcast)
+        updatePodcastMetadata(podcast.bridgeMetadata())
+    }
+
+    @Query("UPDATE podcast_table SET isFavorite = :favorite, favoriteTime = :time WHERE podcastId = :id AND isFavorite != :favorite")
+    suspend fun updatePodcastFavorite(id: String, favorite: Boolean, time: LocalDateTime?): Int
+    @Update(entity = PodcastsEntity::class)
+    suspend fun updatePodcastMetadata(metadata: PodcastBridgeMetadata)
+
+    @Update(entity = ArtistEntity::class)
+    suspend fun updateArtistMetadata(metadata: ArtistBridgeMetadata)
+
+    @Update(entity = AlbumEntity::class)
+    suspend fun updateAlbumMetadata(metadata: AlbumBridgeMetadata)
+
+    @Update(entity = SongEntity::class)
+    suspend fun updateSongMetadata(metadata: SongBridgeMetadata)
+
     // Transaction request with multiple queries
     @Transaction
     suspend fun getAllRecentData(): List<RecentlyType> {
@@ -574,8 +597,11 @@ internal interface DatabaseDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSetVideoId(setVideoIdEntity: SetVideoIdEntity)
 
-    @Query("SELECT * FROM set_video_id WHERE videoId = :videoId")
-    suspend fun getSetVideoId(videoId: String): SetVideoIdEntity?
+    @Query("SELECT * FROM set_video_id WHERE videoId = :videoId AND youtubePlaylistId IN (:playlistIds) ORDER BY CASE WHEN youtubePlaylistId = '' THEN 1 ELSE 0 END LIMIT 1")
+    suspend fun getSetVideoId(videoId: String, playlistIds: List<String>): SetVideoIdEntity?
+
+    @Query("DELETE FROM set_video_id WHERE videoId = :videoId AND youtubePlaylistId = :playlistId")
+    suspend fun deleteSetVideoId(videoId: String, playlistId: String)
 
     // PairSongLocalPlaylist
     @Insert(onConflict = OnConflictStrategy.REPLACE)

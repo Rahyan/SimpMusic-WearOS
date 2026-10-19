@@ -45,6 +45,7 @@ import com.maxrave.domain.mediaservice.handler.DownloadHandler
 import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
 import com.maxrave.domain.mediaservice.handler.PlayerEvent
 import com.maxrave.domain.mediaservice.handler.SimpleMediaState
+import com.maxrave.simpmusic.wear.ui.components.WearScreenHeader
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -66,6 +67,7 @@ fun SongDetailsScreen(
     val nowPlayingState = mediaPlayerHandler.nowPlayingState.collectAsStateWithLifecycle().value
     val downloadTaskState = downloadHandler.downloadTask.collectAsStateWithLifecycle().value
     val simpleState = mediaPlayerHandler.simpleMediaState.collectAsStateWithLifecycle().value
+    val addToQueueBlock = mediaPlayerHandler.addToQueueBlock.collectAsStateWithLifecycle().value
     val queueTracks = mediaPlayerHandler.queueData.collectAsStateWithLifecycle().value?.data?.listTracks.orEmpty()
 
     val nowPlayingVideoId =
@@ -147,23 +149,7 @@ fun SongDetailsScreen(
         )
 
     WearList {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Song details",
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
+        item { WearScreenHeader("Song details", onBack = onBack) }
 
         item { Spacer(Modifier.height(4.dp)) }
 
@@ -298,14 +284,16 @@ fun SongDetailsScreen(
             FilledTonalButton(
                 onClick = {
                     scope.launch {
-                        mediaPlayerHandler.loadMoreCatalog(arrayListOf(track), isAddToQueue = true)
-                        Toast.makeText(context, "Added to queue", Toast.LENGTH_SHORT).show()
+                        if (mediaPlayerHandler.loadMoreCatalog(arrayListOf(track), isAddToQueue = true)) {
+                            Toast.makeText(context, "Added to queue", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
+                enabled = addToQueueBlock == null,
                 colors = tonalButtonColors,
             ) {
-                Text("Add to queue")
+                Text(addToQueueBlock?.message ?: "Add to queue")
             }
         }
 

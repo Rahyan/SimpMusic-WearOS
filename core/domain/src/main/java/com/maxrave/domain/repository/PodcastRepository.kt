@@ -8,6 +8,8 @@ import com.maxrave.domain.utils.Resource
 import kotlinx.coroutines.flow.Flow
 
 interface PodcastRepository {
+    suspend fun updatePodcastMetadata(item: PodcastsEntity)
+
     fun getPodcastData(podcastId: String): Flow<Resource<PodcastBrowse>>
 
     fun insertPodcast(podcastsEntity: PodcastsEntity): Flow<Long>

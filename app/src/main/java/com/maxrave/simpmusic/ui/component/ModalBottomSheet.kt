@@ -1210,6 +1210,7 @@ fun NowPlayingBottomSheet(
     val context = LocalContext.current
 
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val addToQueueBlock by viewModel.addToQueueBlock.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     val modelBottomSheetState =
         rememberModalBottomSheetState(
@@ -1627,7 +1628,9 @@ fun NowPlayingBottomSheet(
                     }
                     ActionButton(
                         icon = painterResource(id = R.drawable.baseline_queue_music_24),
-                        text = R.string.add_to_queue,
+                        text = if (addToQueueBlock == null) R.string.add_to_queue else null,
+                        textString = addToQueueBlock?.message,
+                        enable = addToQueueBlock == null,
                     ) {
                         viewModel.onUIEvent(NowPlayingBottomSheetUIEvent.AddToQueue)
                     }

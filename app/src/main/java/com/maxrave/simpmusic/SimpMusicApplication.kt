@@ -62,6 +62,8 @@ class SimpMusicApplication :
 
     override fun onCreate() {
         super.onCreate()
+        Logger.configure(java.io.File(filesDir, "diagnostics"), BuildConfig.DEBUG)
+        com.maxrave.nativemedia.PhoneNativeMediaEngine.install(this)
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         configCrashlytics(this)
         startKoin {
@@ -119,11 +121,11 @@ class SimpMusicApplication :
                 6,
                 TimeUnit.HOURS,
             ).setConstraints(constraints)
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.MINUTES)
+                .setBackoffCriteria(BackoffPolicy.LINEAR, 1, TimeUnit.MINUTES)
                 .build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             WatchCompanionAutoSyncWorker.UNIQUE_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             request,
         )
     }

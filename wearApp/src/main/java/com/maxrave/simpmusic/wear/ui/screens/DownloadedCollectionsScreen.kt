@@ -28,6 +28,7 @@ import com.maxrave.domain.data.entities.PodcastsEntity
 import com.maxrave.domain.data.type.PlaylistType
 import com.maxrave.domain.repository.PlaylistRepository
 import com.maxrave.simpmusic.wear.ui.components.WearEmptyState
+import com.maxrave.simpmusic.wear.ui.components.WearScreenHeader
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import org.koin.core.context.GlobalContext
 
@@ -45,29 +46,13 @@ fun DownloadedCollectionsScreen(
     val downloaded by playlistRepository.getAllDownloadedPlaylist().collectAsStateWithLifecycle(initialValue = emptyList())
 
     WearList(state = listState) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Collections",
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
+        item { WearScreenHeader("Collections", onBack = onBack) }
 
         if (downloading.isEmpty() && downloaded.isEmpty()) {
             item {
                 WearEmptyState(
                     title = "No downloaded collections yet.",
-                    hint = "Download playlists, albums, or podcasts from phone to sync here.",
+                    hint = "Download music on this watch to listen offline.",
                 )
             }
             return@WearList

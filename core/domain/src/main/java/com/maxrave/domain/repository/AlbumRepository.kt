@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.Flow
 import java.time.LocalDateTime
 
 interface AlbumRepository {
+    suspend fun updateAlbumMetadata(item: AlbumEntity)
+
     fun getAllAlbums(limit: Int): Flow<List<AlbumEntity>>
 
     fun getAlbum(id: String): Flow<AlbumEntity?>

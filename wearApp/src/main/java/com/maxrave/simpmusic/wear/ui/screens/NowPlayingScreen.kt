@@ -1,83 +1,69 @@
 package com.maxrave.simpmusic.wear.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
 import android.content.Context
+import android.os.SystemClock
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
-import androidx.compose.foundation.Canvas
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOne
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material.icons.filled.Watch
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Lyrics
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.wear.compose.material3.Icon
 import androidx.wear.compose.material3.IconButton
+import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.gms.wearable.Wearable
 import com.maxrave.common.WearCompanionBridge
 import com.maxrave.common.Config
@@ -91,15 +77,19 @@ import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.mediaservice.handler.DownloadHandler
 import com.maxrave.domain.mediaservice.handler.MediaPlayerHandler
 import com.maxrave.domain.mediaservice.handler.PlayerEvent
-import com.maxrave.domain.mediaservice.handler.RepeatState
 import com.maxrave.domain.mediaservice.handler.SimpleMediaState
 import com.maxrave.domain.repository.LyricsCanvasRepository
 import com.maxrave.domain.utils.Resource
 import com.maxrave.domain.utils.toTrack
-import com.maxrave.simpmusic.wear.ui.components.PlaybackControlIcon
-import com.maxrave.simpmusic.wear.ui.components.ThinProgressBar
+import com.maxrave.simpmusic.wear.ui.components.rotaryVolume
+import com.maxrave.simpmusic.wear.ui.components.WatchPlayerFace
+import com.maxrave.simpmusic.wear.ui.components.PlayerDrawer
+import com.maxrave.simpmusic.wear.ui.components.PlayerDrawerState
+import com.maxrave.simpmusic.wear.ui.components.PlayerControls
+import com.maxrave.simpmusic.wear.ui.util.openWatchAudioOutput
 import com.maxrave.simpmusic.wear.ui.components.WearEmptyState
 import com.maxrave.simpmusic.wear.ui.components.WearLoadingState
+import com.maxrave.simpmusic.wear.ui.components.WearScreenHeader
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import com.maxrave.simpmusic.wear.ui.theme.KEY_WEAR_PLAYER_STYLE
 import com.maxrave.simpmusic.wear.ui.theme.KEY_WEAR_BATTERY_SAVER_MODE
@@ -116,6 +106,9 @@ import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.CancellationException
+import com.maxrave.simpmusic.wear.ui.optionalValue
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -165,7 +158,9 @@ fun NowPlayingScreen(
     LaunchedEffect(phoneOffloadEnabled) {
         if (!phoneOffloadEnabled) watchOnlyOverride = false
     }
-    val isLoading = simpleState is SimpleMediaState.Loading || simpleState is SimpleMediaState.Buffering
+    val playerState = mediaPlayerHandler.player.playbackState
+    val isLoading = playerState == com.maxrave.domain.data.player.PlayerConstants.STATE_BUFFERING ||
+        (playerState == com.maxrave.domain.data.player.PlayerConstants.STATE_IDLE && !controlState.isPlaying && simpleState is SimpleMediaState.Loading)
     val detailTrack = nowPlayingState.track ?: nowPlayingState.songEntity?.toTrack()
     var showDetails by rememberSaveable(nowPlayingState.mediaItem.mediaId) { mutableStateOf(false) }
 
@@ -183,6 +178,15 @@ fun NowPlayingScreen(
             },
             onOpenNowPlaying = { showDetails = false },
         )
+        return
+    }
+
+    if (!nowPlayingState.isNotEmpty()) {
+        WearList {
+            item { WearScreenHeader("Player", onBack = onBack) }
+            item { WearEmptyState("Find your next favorite", "Pick a song in Discover or your library. Your player will appear here.") }
+            item { FilledTonalButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("Browse music") } }
+        }
         return
     }
 
@@ -216,19 +220,25 @@ fun NowPlayingScreen(
             else -> mediaPlayerHandler.getProgress()
         }
     var progressMs by rememberSaveable { mutableLongStateOf(rawProgressMs) }
-    LaunchedEffect(rawProgressMs, controlState.isPlaying, durationMs) {
+    val progressLifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(nowPlayingState.mediaItem.mediaId, controlState.isPlaying, durationMs, wearBatterySaverEnabled, progressLifecycleOwner) {
         progressMs = rawProgressMs
         if (!controlState.isPlaying) return@LaunchedEffect
-        while (controlState.isPlaying) {
-            delay(1000L)
-            val latest = mediaPlayerHandler.getProgress()
-            progressMs =
-                if (durationMs > 0L) {
-                    latest.coerceIn(0L, durationMs)
-                } else {
-                    latest.coerceAtLeast(0L)
-                }
+        progressLifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (controlState.isPlaying) {
+                val latest = mediaPlayerHandler.getProgress()
+                progressMs =
+                    if (durationMs > 0L) {
+                        latest.coerceIn(0L, durationMs)
+                    } else {
+                        latest.coerceAtLeast(0L)
+                    }
+                delay(if (wearBatterySaverEnabled) 1000L else 250L)
+            }
         }
+    }
+    LaunchedEffect(rawProgressMs, controlState.isPlaying) {
+        if (!controlState.isPlaying) progressMs = rawProgressMs
     }
     val effectiveProgressMs =
         if (wearBatterySaverEnabled) {
@@ -249,16 +259,10 @@ fun NowPlayingScreen(
             durationMs <= 0L &&
             effectiveProgressMs <= 0L
     val showLoadingUi = isLoading || isResolvingStream
-    val listState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() }
     val currentDownloadState = detailTrack?.videoId?.let { downloadTaskState[it] } ?: DownloadState.STATE_NOT_DOWNLOADED
     val canTriggerDownload = detailTrack != null && currentDownloadState == DownloadState.STATE_NOT_DOWNLOADED
     val canRemoveDownload = detailTrack != null && currentDownloadState == DownloadState.STATE_DOWNLOADED
     val downloadEnabled = canTriggerDownload || canRemoveDownload
-    val downloadIconTint =
-        when (currentDownloadState) {
-            DownloadState.STATE_NOT_DOWNLOADED -> MaterialTheme.colorScheme.onSurface
-            else -> MaterialTheme.colorScheme.primary
-        }
     val downloadContentDescription =
         when {
             detailTrack == null -> "Download unavailable"
@@ -283,9 +287,9 @@ fun NowPlayingScreen(
     var immersiveTint by remember(nowPlayingState.mediaItem.mediaId) {
         mutableStateOf(defaultImmersiveTint)
     }
-    LaunchedEffect(artworkUrl, nowPlayingState.mediaItem.mediaId, defaultImmersiveTint, wearBatterySaverEnabled) {
+    LaunchedEffect(artworkUrl, playerStyle, nowPlayingState.mediaItem.mediaId, defaultImmersiveTint, wearBatterySaverEnabled) {
         immersiveTint =
-            if (!wearBatterySaverEnabled && !artworkUrl.isNullOrBlank()) {
+            if (playerStyle == WEAR_PLAYER_STYLE_IMMERSIVE && !wearBatterySaverEnabled && !artworkUrl.isNullOrBlank()) {
                 loadArtworkAccentColor(context, artworkUrl) ?: defaultImmersiveTint
             } else {
                 defaultImmersiveTint
@@ -296,14 +300,17 @@ fun NowPlayingScreen(
     val queueData = mediaPlayerHandler.queueData.collectAsStateWithLifecycle().value?.data
     val queueTracks = queueData?.listTracks.orEmpty()
     val queueCurrentIndex = mediaPlayerHandler.currentSongIndex.collectAsStateWithLifecycle().value
+    var lyricsRequested by remember(currentMediaId) { mutableStateOf(false) }
+    var transportPending by remember { mutableStateOf(false) }
+    var seekTarget by remember { mutableStateOf<String?>(null) }
     var lyricsUiState by remember(currentMediaId) { mutableStateOf<WearLyricsUiState>(WearLyricsUiState.Loading) }
-    LaunchedEffect(currentMediaId, title, artist, durationSeconds, currentDownloadState) {
-        if (currentMediaId.isBlank()) {
+    LaunchedEffect(currentMediaId, lyricsRequested, title, artist, durationSeconds, currentDownloadState) {
+        if (currentMediaId.isBlank() || !lyricsRequested) {
             lyricsUiState = WearLyricsUiState.Empty
             return@LaunchedEffect
         }
         lyricsUiState = WearLyricsUiState.Loading
-        lyricsUiState =
+        lyricsUiState = try {
             loadWearLyricsState(
                 lyricsCanvasRepository = lyricsCanvasRepository,
                 dataStoreManager = dataStoreManager,
@@ -313,24 +320,60 @@ fun NowPlayingScreen(
                 durationSeconds = durationSeconds,
                 preferOfflineFirst = currentDownloadState == DownloadState.STATE_DOWNLOADED,
             )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            WearLyricsUiState.Empty
+        }
     }
+    LaunchedEffect(currentMediaId) { if (seekTarget != currentMediaId) seekTarget = null }
+    if (seekTarget != null && durationMs > 0) {
+        val targetId = seekTarget
+        SeekScreen(effectiveProgressMs, durationMs, onApply = { position ->
+            scope.launch {
+                val currentDuration = mediaPlayerHandler.getPlayerDuration()
+                if (mediaPlayerHandler.player.currentMediaItem?.mediaId == targetId && currentDuration > 0) {
+                    mediaPlayerHandler.onPlayerEvent(PlayerEvent.UpdateProgress(position.coerceIn(0, currentDuration).toFloat() / currentDuration * 100f))
+                }
+                seekTarget = null
+            }
+        }, onCancel = { seekTarget = null })
+        return
+    }
+
     suspend fun dispatchTransportWithOffload(
         command: String,
         fallback: suspend () -> Unit,
     ): Boolean {
+        if (transportPending) return false
+        transportPending = true
+        try {
         if (!offloadActive) {
             fallback()
             return false
         }
-        val sent = sendRemoteCommandToPhone(context, command)
+        val sent =
+            sendRemoteCommandToPhone(
+                context = context,
+                dataStoreManager = dataStoreManager,
+                command = command,
+            )
         if (sent) return true
         fallback()
         Toast.makeText(context, "Phone not reachable, using watch playback", Toast.LENGTH_SHORT).show()
         return false
+        } finally { transportPending = false }
     }
 
-    if (playerStyle == WEAR_PLAYER_STYLE_IMMERSIVE) {
-        var advancedExpanded by rememberSaveable(nowPlayingState.mediaItem.mediaId) { mutableStateOf(false) }
+    run {
+        var volumeFeedback by remember { mutableStateOf<Float?>(null) }
+        var volumeFeedbackAt by remember { mutableLongStateOf(0L) }
+        LaunchedEffect(volumeFeedbackAt) {
+            if (volumeFeedbackAt > 0L) { delay(1500); volumeFeedback = null }
+        }
+        val drawer = rememberSaveable(nowPlayingState.mediaItem.mediaId, saver = PlayerDrawerState.Saver) { PlayerDrawerState() }
+        val drawerClosed by remember(drawer) { derivedStateOf { drawer.fraction == 0f && !drawer.dragging } }
+        val advancedExpanded = drawer.expanded
         var sheetTab by rememberSaveable(nowPlayingState.mediaItem.mediaId) { mutableStateOf(WearSheetTab.CONTROLS) }
         var lyricsDisplayMode by rememberSaveable(nowPlayingState.mediaItem.mediaId) { mutableStateOf(WearLyricsDisplayMode.ORIGINAL) }
         val expandedSheetListState = rememberSaveable(nowPlayingState.mediaItem.mediaId, saver = LazyListState.Saver) { LazyListState() }
@@ -359,53 +402,17 @@ fun NowPlayingScreen(
             )
         }
         val immersiveOverlayColor =
-            lerp(MaterialTheme.colorScheme.surfaceContainerHigh, immersiveTint, 0.34f).copy(alpha = 0.72f)
+            // A bright cover must not wash out the player labels and transport controls.
+            lerp(Color.Black, immersiveTint, 0.08f).copy(alpha = 0.58f)
         val immersiveSheetColor =
             lerp(MaterialTheme.colorScheme.surfaceContainerHigh, immersiveTint, 0.30f).copy(alpha = 0.96f)
-
-        val dragSheetModifier =
-            Modifier.pointerInput(advancedExpanded) {
-                var totalDrag = 0f
-                detectVerticalDragGestures(
-                    onVerticalDrag = { change, dragAmount ->
-                        change.consume()
-                        totalDrag += dragAmount
-                    },
-                    onDragEnd = {
-                        if (!advancedExpanded && totalDrag < -28f) {
-                            advancedExpanded = true
-                        } else if (advancedExpanded && totalDrag > 28f) {
-                            advancedExpanded = false
-                        }
-                        totalDrag = 0f
-                    },
-                    onDragCancel = { totalDrag = 0f },
-                )
-            }
-        val expandedSheetDragModifier =
-            Modifier.pointerInput(advancedExpanded, expandedSheetListState) {
-                if (!advancedExpanded) return@pointerInput
-                var downwardDrag = 0f
-                detectVerticalDragGestures(
-                    onVerticalDrag = { _, dragAmount ->
-                        if (dragAmount > 0f) {
-                            downwardDrag += dragAmount
-                        }
-                    },
-                    onDragEnd = {
-                        if (downwardDrag > 30f) advancedExpanded = false
-                        downwardDrag = 0f
-                    },
-                    onDragCancel = { downwardDrag = 0f },
-                )
-            }
 
         Box(
             modifier =
                 Modifier
                     .fillMaxSize(),
         ) {
-            if (!artworkUrl.isNullOrBlank()) {
+            if (playerStyle == WEAR_PLAYER_STYLE_IMMERSIVE && !artworkUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = artworkUrl,
                     contentDescription = title,
@@ -420,167 +427,40 @@ fun NowPlayingScreen(
                         .background(immersiveOverlayColor),
             )
 
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Spacer(Modifier.height(36.dp))
-
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Clip,
-                    color =
-                        if (detailTrack != null) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurface
-                        },
-                    textAlign = TextAlign.Center,
-                    modifier =
-                        (if (detailTrack != null) {
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable { showDetails = true }
-                        } else {
-                            Modifier.fillMaxWidth()
-                        }).basicMarquee(),
-                )
-                if (artist.isNotBlank()) {
-                    Text(
-                        text = artist,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                Spacer(Modifier.weight(1f))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            scope.launch {
-                                dispatchTransportWithOffload(WearCompanionBridge.REMOTE_PREVIOUS) {
-                                    mediaPlayerHandler.onPlayerEvent(PlayerEvent.Previous)
-                                }
-                            }
-                        },
-                        enabled = controlState.isPreviousAvailable,
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous")
-                    }
-
-                    CircularProgressPlayButton(
-                        progressFraction = progressFraction,
-                        isPlaying = controlState.isPlaying,
-                        isLoading = showLoadingUi && !controlState.isPlaying && !retrySuggested,
-                        progressColor = MaterialTheme.colorScheme.primary,
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            scope.launch {
-                                dispatchTransportWithOffload(WearCompanionBridge.REMOTE_PLAY_PAUSE) {
-                                    if (!controlState.isPlaying && nowPlayingState.isNotEmpty() && (retrySuggested || showLoadingUi)) {
-                                        mediaPlayerHandler.retryCurrentStream()
-                                    } else {
-                                        mediaPlayerHandler.onPlayerEvent(PlayerEvent.PlayPause)
-                                    }
-                                }
-                            }
-                        },
-                    )
-
-                    IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            scope.launch {
-                                dispatchTransportWithOffload(WearCompanionBridge.REMOTE_NEXT) {
-                                    mediaPlayerHandler.onPlayerEvent(PlayerEvent.Next)
-                                }
-                            }
-                        },
-                        enabled = controlState.isNextAvailable,
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(Icons.Filled.SkipNext, contentDescription = "Next")
-                    }
-                }
-
-                Spacer(Modifier.height(4.dp))
-                if (durationMs > 0L) {
-                    Text(
-                        text = "${formatDurationMs(effectiveProgressMs)}/${formatDurationMs(durationMs)}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                } else {
-                    Text(
-                        text =
-                            when {
-                                retrySuggested -> "Stream timed out. Tap play to retry."
-                                controlState.isPlaying -> "Buffering..."
-                                else -> "Resolving stream..."
-                            },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                Spacer(Modifier.weight(1f))
-            }
-
-            AnimatedVisibility(
-                visible = advancedExpanded,
-                enter = expandVertically(expandFrom = Alignment.Bottom),
-                exit = shrinkVertically(shrinkTowards = Alignment.Bottom),
-                modifier = Modifier.align(Alignment.BottomCenter),
-            ) {
-                LazyColumn(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                            .background(immersiveSheetColor)
-                            .padding(horizontal = 14.dp)
-                            .then(expandedSheetDragModifier),
-                    state = expandedSheetListState,
-                    contentPadding = PaddingValues(top = 24.dp, bottom = 22.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    item {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .width(34.dp)
-                                        .height(5.dp)
-                                        .then(dragSheetModifier)
-                                        .clip(RoundedCornerShape(99.dp))
-                                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f))
-                                        .clickable { advancedExpanded = false },
-                            )
-                        }
-                    }
+            PlayerDrawer(drawer, expandedSheetListState, immersiveSheetColor, player = { dragSheetModifier ->
+            WatchPlayerFace(
+                title = title, artist = artist, artwork = artworkUrl, immersive = playerStyle == WEAR_PLAYER_STYLE_IMMERSIVE,
+                isPlaying = controlState.isPlaying, loading = showLoadingUi && !controlState.isPlaying && !retrySuggested,
+                status = when {
+                    offloadActive -> "Phone controls"
+                    retrySuggested -> "Taking longer · Tap play to retry"
+                    showLoadingUi -> if (durationMs > 0) "Buffering…" else "Finding stream…"
+                    currentDownloadState == DownloadState.STATE_DOWNLOADED -> "On watch · Downloaded"
+                    else -> "On watch"
+                }, progress = progressFraction,
+                time = if (durationMs > 0) "${formatDurationMs(effectiveProgressMs)} / ${formatDurationMs(durationMs)}" else "— / —",
+                canPrevious = controlState.isPreviousAvailable && !transportPending, canNext = controlState.isNextAvailable && !transportPending,
+                canToggle = !transportPending && (!showLoadingUi || retrySuggested || controlState.isPlaying),
+                canSeek = durationMs > 0 && !offloadActive,
+                onPrevious = { scope.launch { dispatchTransportWithOffload(WearCompanionBridge.REMOTE_PREVIOUS) { mediaPlayerHandler.onPlayerEvent(PlayerEvent.Previous) } } },
+                onToggle = { scope.launch { dispatchTransportWithOffload(WearCompanionBridge.REMOTE_PLAY_PAUSE) {
+                    if (!controlState.isPlaying && retrySuggested) mediaPlayerHandler.retryCurrentStream()
+                    else mediaPlayerHandler.onPlayerEvent(PlayerEvent.PlayPause)
+                } } },
+                onNext = { scope.launch { dispatchTransportWithOffload(WearCompanionBridge.REMOTE_NEXT) { mediaPlayerHandler.onPlayerEvent(PlayerEvent.Next) } } },
+                onSeek = { seekTarget = currentMediaId }, onQueue = onOpenQueue,
+                onMore = { drawer.moveTo(scope, true) },
+                isLiked = controlState.isLiked,
+                onLike = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); mediaPlayerHandler.toggleLike() },
+                onOutput = { context.openWatchAudioOutput() }, onVolume = onOpenVolumeSettings,
+                canAdjustOutput = !offloadActive, drawerModifier = dragSheetModifier,
+                volumeFraction = volumeFeedback,
+                modifier = Modifier.rotaryVolume(drawerClosed && !offloadActive && androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.15f && androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp >= 190) { current, maximum ->
+                    volumeFeedback = current.toFloat() / maximum
+                    volumeFeedbackAt = SystemClock.elapsedRealtime()
+                },
+            )
+            }) {
                     item {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -609,22 +489,17 @@ fun NowPlayingScreen(
                                                         MaterialTheme.colorScheme.outline.copy(alpha = 0.38f)
                                                     },
                                                 shape = RoundedCornerShape(999.dp),
-                                            ).clickable {
+                                            ).clickable(role = Role.Tab) {
                                                 sheetTab = tab
-                                            }.padding(vertical = 6.dp),
+                                                if (tab == WearSheetTab.LYRICS) lyricsRequested = true
+                                            }.semantics { this.selected = selected }.height(48.dp),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Text(
-                                        text = tab.label,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color =
-                                            if (selected) {
-                                                MaterialTheme.colorScheme.onPrimaryContainer
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurfaceVariant
-                                            },
-                                        maxLines = 1,
-                                    )
+                                    Icon(when (tab) {
+                                        WearSheetTab.CONTROLS -> Icons.Filled.Tune
+                                        WearSheetTab.LYRICS -> Icons.Filled.Lyrics
+                                        WearSheetTab.QUEUE -> Icons.AutoMirrored.Filled.QueueMusic
+                                    }, tab.label, Modifier.size(24.dp), tint = Color.White)
                                 }
                             }
                         }
@@ -632,164 +507,44 @@ fun NowPlayingScreen(
                     when (sheetTab) {
                         WearSheetTab.CONTROLS -> {
                             item {
-                                Row(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f))
-                                            .clickable(enabled = phoneOffloadEnabled) {
-                                                watchOnlyOverride = !watchOnlyOverride
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            }.padding(horizontal = 10.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(
-                                        imageVector = if (offloadActive) Icons.Filled.PhoneAndroid else Icons.Filled.Watch,
-                                        contentDescription = "Offload mode",
-                                        tint = if (offloadActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    Text(
-                                        text =
-                                            when {
-                                                offloadActive -> "Offload mode: Phone"
-                                                phoneOffloadEnabled -> "Offload mode: Watch override"
-                                                else -> "Offload mode: Off"
-                                            },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                    )
-                                }
+                                PlayerControls(controlState.isShuffle, controlState.repeatState, canRemoveDownload,
+                                    downloadEnabled, downloadContentDescription, !offloadActive, queueTracks.isNotEmpty(),
+                                    onShuffle = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        scope.launch { mediaPlayerHandler.onPlayerEvent(PlayerEvent.Shuffle) }
+                                    }, onRepeat = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        scope.launch { mediaPlayerHandler.onPlayerEvent(PlayerEvent.Repeat) }
+                                    }, onQueue = onOpenQueue, onDownload = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        scope.launch {
+                                            val track = detailTrack ?: return@launch
+                                            if (canRemoveDownload) {
+                                                downloadHandler.removeDownload(track.videoId)
+                                                Toast.makeText(context, "Download removed", Toast.LENGTH_SHORT).show()
+                                            } else if (canTriggerDownload) {
+                                                val thumb = track.thumbnails?.lastOrNull()?.url ?: "https://i.ytimg.com/vi/${track.videoId}/maxresdefault.jpg"
+                                                downloadHandler.downloadTrack(track.videoId, track.title, thumb)
+                                                Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    }, onVolume = onOpenVolumeSettings, onHandoff = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        scope.launch {
+                                            val handedOff = sendQueueHandoffToPhone(context, dataStoreManager, queueTracks,
+                                                queueCurrentIndex, queueData?.playlistId, queueData?.playlistName, queueData?.playlistType?.name)
+                                            if (handedOff && controlState.isPlaying) mediaPlayerHandler.onPlayerEvent(PlayerEvent.PlayPause)
+                                            Toast.makeText(context, if (handedOff) "Phone confirmed handoff" else "Phone handoff not confirmed", Toast.LENGTH_SHORT).show()
+                                        }
+                                    })
                             }
-                            item {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    IconButton(
-                                        onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            scope.launch { mediaPlayerHandler.onPlayerEvent(PlayerEvent.Shuffle) }
-                                        },
-                                        modifier = Modifier.size(40.dp),
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.Shuffle,
-                                            contentDescription = "Shuffle",
-                                            tint = if (controlState.isShuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            scope.launch { mediaPlayerHandler.onPlayerEvent(PlayerEvent.Repeat) }
-                                        },
-                                        modifier = Modifier.size(40.dp),
-                                    ) {
-                                        val (icon, tint) =
-                                            when (controlState.repeatState) {
-                                                RepeatState.None -> Icons.Filled.Repeat to MaterialTheme.colorScheme.onSurface
-                                                RepeatState.All -> Icons.Filled.Repeat to MaterialTheme.colorScheme.primary
-                                                RepeatState.One -> Icons.Filled.RepeatOne to MaterialTheme.colorScheme.primary
-                                            }
-                                        Icon(icon, contentDescription = "Repeat", tint = tint)
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            mediaPlayerHandler.toggleLike()
-                                        },
-                                        modifier = Modifier.size(40.dp),
-                                    ) {
-                                        Icon(
-                                            if (controlState.isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                                            contentDescription = "Like",
-                                            tint = if (controlState.isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                        )
-                                    }
-                                }
-                            }
-                            item {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    IconButton(
-                                        onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            onOpenQueue()
-                                        },
-                                        modifier = Modifier.size(40.dp),
-                                    ) {
-                                        Icon(Icons.AutoMirrored.Filled.QueueMusic, contentDescription = "Queue")
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            scope.launch {
-                                                val track = detailTrack ?: return@launch
-                                                if (canRemoveDownload) {
-                                                    downloadHandler.removeDownload(track.videoId)
-                                                    Toast.makeText(context, "Download removed", Toast.LENGTH_SHORT).show()
-                                                } else if (canTriggerDownload) {
-                                                    val thumb = track.thumbnails?.lastOrNull()?.url ?: "https://i.ytimg.com/vi/${track.videoId}/maxresdefault.jpg"
-                                                    downloadHandler.downloadTrack(track.videoId, track.title, thumb)
-                                                    Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
-                                        },
-                                        modifier = Modifier.size(40.dp),
-                                        enabled = downloadEnabled,
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.Download,
-                                            contentDescription = downloadContentDescription,
-                                            tint = downloadIconTint,
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            onOpenVolumeSettings()
-                                        },
-                                        modifier = Modifier.size(40.dp),
-                                    ) {
-                                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Volume")
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            scope.launch {
-                                                val handedOff =
-                                                    sendQueueHandoffToPhone(
-                                                        context = context,
-                                                        dataStoreManager = dataStoreManager,
-                                                        queueTracks = queueTracks,
-                                                        currentIndex = queueCurrentIndex,
-                                                        playlistId = queueData?.playlistId,
-                                                        playlistName = queueData?.playlistName,
-                                                        playlistType = queueData?.playlistType?.name,
-                                                    )
-                                                if (handedOff && controlState.isPlaying) {
-                                                    mediaPlayerHandler.onPlayerEvent(PlayerEvent.PlayPause)
-                                                }
-                                                Toast
-                                                    .makeText(
-                                                        context,
-                                                        if (handedOff) "Phone confirmed handoff" else "Phone handoff not confirmed",
-                                                        Toast.LENGTH_SHORT,
-                                                    ).show()
-                                            }
-                                        },
-                                        modifier = Modifier.size(40.dp),
-                                        enabled = queueTracks.isNotEmpty(),
-                                    ) {
-                                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Continue on phone")
-                                    }
-                                }
+                            if (phoneOffloadEnabled) item {
+                                Text(if (offloadActive) "Controls on phone" else "Controls on watch",
+                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().clickable {
+                                        watchOnlyOverride = !watchOnlyOverride
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    }.padding(vertical = 8.dp))
                             }
                         }
 
@@ -926,7 +681,7 @@ fun NowPlayingScreen(
                                 items(queueTracks.size) { index ->
                                     val queueTrack = queueTracks[index]
                                     val isCurrent = index == queueCurrentIndex
-                                    Row(
+                                    Column(
                                         modifier =
                                             Modifier
                                                 .fillMaxWidth()
@@ -941,9 +696,9 @@ fun NowPlayingScreen(
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                     mediaPlayerHandler.playMediaItemInMediaSource(index)
                                                 }.padding(horizontal = 10.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
+                                        verticalArrangement = Arrangement.spacedBy(6.dp),
                                     ) {
-                                        Column(modifier = Modifier.weight(1f)) {
+                                        Column(modifier = Modifier.fillMaxWidth()) {
                                             Text(
                                                 text = queueTrack.title,
                                                 style = MaterialTheme.typography.bodyMedium,
@@ -973,14 +728,14 @@ fun NowPlayingScreen(
                                                 )
                                             }
                                         }
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                                             IconButton(
                                                 onClick = {
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                     scope.launch { mediaPlayerHandler.moveItemUp(index) }
                                                 },
                                                 enabled = index > 0,
-                                                modifier = Modifier.size(26.dp),
+                                                modifier = Modifier.size(48.dp),
                                             ) {
                                                 Icon(Icons.Filled.ArrowUpward, contentDescription = "Move up")
                                             }
@@ -990,7 +745,7 @@ fun NowPlayingScreen(
                                                     scope.launch { mediaPlayerHandler.moveItemDown(index) }
                                                 },
                                                 enabled = index < queueTracks.lastIndex,
-                                                modifier = Modifier.size(26.dp),
+                                                modifier = Modifier.size(48.dp),
                                             ) {
                                                 Icon(Icons.Filled.ArrowDownward, contentDescription = "Move down")
                                             }
@@ -999,7 +754,7 @@ fun NowPlayingScreen(
                                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                                     mediaPlayerHandler.removeMediaItem(index)
                                                 },
-                                                modifier = Modifier.size(26.dp),
+                                                modifier = Modifier.size(48.dp),
                                             ) {
                                                 Icon(Icons.Filled.Delete, contentDescription = "Remove")
                                             }
@@ -1009,420 +764,12 @@ fun NowPlayingScreen(
                             }
                         }
                     }
-                }
             }
 
-            if (!advancedExpanded) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(bottom = 8.dp)
-                            .width(28.dp)
-                            .height(4.dp)
-                            .then(dragSheetModifier)
-                            .clip(RoundedCornerShape(99.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.62f)),
-                )
-            }
         }
         return
     }
 
-    WearList(state = listState) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Now playing",
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-
-        item { Spacer(Modifier.height(6.dp)) }
-
-        item {
-            ArtworkThumb(
-                title = title,
-                artworkUrl = artworkUrl,
-                onClick = if (detailTrack != null) ({ showDetails = true }) else null,
-            )
-        }
-
-        item { Spacer(Modifier.height(2.dp)) }
-
-        item {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                color =
-                    if (detailTrack != null) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                modifier =
-                    if (detailTrack != null) {
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { showDetails = true }
-                    } else {
-                        Modifier.fillMaxWidth()
-                    },
-            )
-        }
-        if (artist.isNotBlank()) {
-            item {
-                Text(
-                    text = artist,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        item {
-            Text(
-                text =
-                    when {
-                        controlState.isPlaying -> "Playing"
-                        showLoadingUi -> "Connecting..."
-                        else -> "Paused"
-                    },
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        item { Spacer(Modifier.height(8.dp)) }
-
-        if (durationMs > 0L) {
-            item {
-                ThinProgressBar(progress = progressFraction)
-            }
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        text = formatDurationMs(effectiveProgressMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Start,
-                    )
-                    Text(
-                        text = formatDurationMs(durationMs),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.End,
-                    )
-                }
-            }
-        } else {
-            item {
-                Text(
-                    text =
-                        when {
-                            retrySuggested -> "Stream timed out. Tap play to retry."
-                            controlState.isPlaying -> "Buffering..."
-                            else -> "Resolving stream..."
-                        },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-
-        item { Spacer(Modifier.height(6.dp)) }
-
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        scope.launch {
-                            dispatchTransportWithOffload(WearCompanionBridge.REMOTE_PREVIOUS) {
-                                mediaPlayerHandler.onPlayerEvent(PlayerEvent.Previous)
-                            }
-                        }
-                    },
-                    enabled = controlState.isPreviousAvailable,
-                ) {
-                    Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous")
-                }
-                IconButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        scope.launch {
-                            dispatchTransportWithOffload(WearCompanionBridge.REMOTE_PLAY_PAUSE) {
-                                if (!controlState.isPlaying && nowPlayingState.isNotEmpty() && (retrySuggested || showLoadingUi)) {
-                                    mediaPlayerHandler.retryCurrentStream()
-                                } else {
-                                    mediaPlayerHandler.onPlayerEvent(PlayerEvent.PlayPause)
-                                }
-                            }
-                        }
-                    },
-                ) {
-                    PlaybackControlIcon(
-                        isPlaying = controlState.isPlaying,
-                        isLoading = showLoadingUi && !controlState.isPlaying && !retrySuggested,
-                    )
-                }
-                IconButton(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        scope.launch {
-                            dispatchTransportWithOffload(WearCompanionBridge.REMOTE_NEXT) {
-                                mediaPlayerHandler.onPlayerEvent(PlayerEvent.Next)
-                            }
-                        }
-                    },
-                    enabled = controlState.isNextAvailable,
-                ) {
-                    Icon(Icons.Filled.SkipNext, contentDescription = "Next")
-                }
-            }
-        }
-
-        item { Spacer(Modifier.height(6.dp)) }
-
-        item {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            scope.launch { mediaPlayerHandler.onPlayerEvent(PlayerEvent.Shuffle) }
-                        },
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            Icons.Filled.Shuffle,
-                            contentDescription = "Shuffle",
-                            tint = if (controlState.isShuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            scope.launch { mediaPlayerHandler.onPlayerEvent(PlayerEvent.Repeat) }
-                        },
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        val (icon, tint) =
-                            when (controlState.repeatState) {
-                                RepeatState.None -> Icons.Filled.Repeat to MaterialTheme.colorScheme.onSurface
-                                RepeatState.All -> Icons.Filled.Repeat to MaterialTheme.colorScheme.primary
-                                RepeatState.One -> Icons.Filled.RepeatOne to MaterialTheme.colorScheme.primary
-                            }
-                        Icon(icon, contentDescription = "Repeat", tint = tint)
-                    }
-                    IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            mediaPlayerHandler.toggleLike()
-                        },
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(
-                            if (controlState.isLiked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
-                            contentDescription = "Like",
-                            tint = if (controlState.isLiked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(0.88f),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            scope.launch {
-                                val track = detailTrack ?: return@launch
-                                if (canRemoveDownload) {
-                                    downloadHandler.removeDownload(track.videoId)
-                                    Toast.makeText(context, "Download removed", Toast.LENGTH_SHORT).show()
-                                } else if (canTriggerDownload) {
-                                    val thumb = track.thumbnails?.lastOrNull()?.url ?: "https://i.ytimg.com/vi/${track.videoId}/maxresdefault.jpg"
-                                    downloadHandler.downloadTrack(track.videoId, track.title, thumb)
-                                    Toast.makeText(context, "Download started", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        modifier = Modifier.size(40.dp),
-                        enabled = downloadEnabled,
-                    ) {
-                        Icon(
-                            Icons.Filled.Download,
-                            contentDescription = downloadContentDescription,
-                            tint = downloadIconTint,
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onOpenVolumeSettings()
-                        },
-                        modifier = Modifier.size(40.dp),
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = "Volume")
-                    }
-                    IconButton(
-                        onClick = {
-                            val nextOverride = !watchOnlyOverride
-                            watchOnlyOverride = nextOverride
-                            val nextOffloadActive = phoneOffloadEnabled && !nextOverride
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            Toast
-                                .makeText(
-                                    context,
-                                    if (nextOffloadActive) "Offload to phone enabled" else "Watch-only control enabled",
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                        },
-                        modifier = Modifier.size(40.dp),
-                        enabled = phoneOffloadEnabled,
-                    ) {
-                        Icon(
-                            imageVector = if (offloadActive) Icons.Filled.PhoneAndroid else Icons.Filled.Watch,
-                            contentDescription = "Toggle watch-only override",
-                            tint = if (offloadActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CircularProgressPlayButton(
-    progressFraction: Float,
-    isPlaying: Boolean,
-    isLoading: Boolean,
-    progressColor: Color,
-    onClick: () -> Unit,
-) {
-    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.24f)
-    val buttonSize = 42.dp
-    val ringStroke = 2.5f
-    val outerSize = 52.dp
-    Box(
-        modifier = Modifier.size(outerSize),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = ringStroke.dp.toPx()
-            drawCircle(
-                color = trackColor,
-                style = Stroke(width = stroke),
-            )
-            if (progressFraction > 0f) {
-                drawArc(
-                    color = progressColor,
-                    startAngle = -90f,
-                    sweepAngle = (progressFraction.coerceIn(0f, 1f) * 360f),
-                    useCenter = false,
-                    style = Stroke(width = stroke, cap = StrokeCap.Round),
-                )
-            }
-        }
-        Box(
-            modifier =
-                Modifier
-                    .size(buttonSize)
-                    .clip(RoundedCornerShape(999.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f))
-                    .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            PlaybackControlIcon(
-                isPlaying = isPlaying,
-                isLoading = isLoading,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ArtworkThumb(
-    title: String,
-    artworkUrl: String?,
-    onClick: (() -> Unit)? = null,
-) {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(86.dp)
-                .clip(MaterialTheme.shapes.large)
-                .background(MaterialTheme.colorScheme.surfaceContainerLow),
-        contentAlignment = Alignment.Center,
-    ) {
-        val contentModifier =
-            if (onClick != null) {
-                Modifier.clickable(onClick = onClick)
-            } else {
-                Modifier
-            }
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(86.dp)
-                    .then(contentModifier),
-        contentAlignment = Alignment.Center,
-        ) {
-        if (!artworkUrl.isNullOrBlank()) {
-            AsyncImage(
-                model = artworkUrl,
-                contentDescription = title,
-                contentScale = ContentScale.Crop,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(86.dp),
-            )
-        } else {
-            Icon(
-                imageVector = Icons.Filled.MusicNote,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        }
-    }
 }
 
 private enum class WearSheetTab(
@@ -1433,7 +780,7 @@ private enum class WearSheetTab(
     QUEUE("Queue"),
 }
 
-private const val LYRICS_LIST_PREFIX_ITEMS = 4
+private const val LYRICS_LIST_PREFIX_ITEMS = 3
 
 private enum class WearLyricsDisplayMode(
     val label: String,
@@ -1483,10 +830,10 @@ private suspend fun loadWearLyricsState(
 ): WearLyricsUiState {
     val provider = dataStoreManager.lyricsProvider.first()
     val translationLanguage = dataStoreManager.translationLanguage.first().ifBlank { "en" }.take(2)
-    val savedOriginalLines = lyricsCanvasRepository.getSavedLyrics(mediaId).first()?.lines.toTimedLyricsLines()
+    val savedOriginalLines = lyricsCanvasRepository.getSavedLyrics(mediaId).firstOrNull()?.lines.toTimedLyricsLines()
     val savedTranslatedLines =
         lyricsCanvasRepository
-            .getSavedTranslatedLyrics(mediaId, translationLanguage).first()
+            .getSavedTranslatedLyrics(mediaId, translationLanguage).firstOrNull()
             ?.lines
             .toTimedLyricsLines()
     if (preferOfflineFirst && savedOriginalLines.isNotEmpty()) {
@@ -1572,12 +919,12 @@ private suspend fun fetchLyricsByProvider(
     val safeDuration = durationSeconds.takeIf { it > 0 }
     return when (provider) {
         DataStoreManager.SIMPMUSIC -> {
-            val resource = lyricsCanvasRepository.getSimpMusicLyrics(mediaId).first()
+            val resource = lyricsCanvasRepository.getSimpMusicLyrics(mediaId).optionalValue()
             val lyrics = (resource as? Resource.Success)?.data
             if (lyrics?.lines.isNullOrEmpty()) {
                 null
             } else {
-                val translatedResource = lyricsCanvasRepository.getSimpMusicTranslatedLyrics(mediaId, translationLanguage).first()
+                val translatedResource = lyricsCanvasRepository.getSimpMusicTranslatedLyrics(mediaId, translationLanguage).optionalValue()
                 val translatedLyrics = (translatedResource as? Resource.Success)?.data
                 WearLyricsResult(
                     source = "SimpMusic",
@@ -1594,13 +941,13 @@ private suspend fun fetchLyricsByProvider(
                         sartist = safeArtist,
                         strack = title,
                         duration = safeDuration,
-                    ).first()
+                    ).optionalValue()
             val lyrics = (resource as? Resource.Success)?.data
             if (lyrics?.lines.isNullOrEmpty()) {
                 null
             } else {
                 val translatedLyrics =
-                    (lyricsCanvasRepository.getAITranslationLyrics(lyrics, translationLanguage).first() as? Resource.Success)?.data
+                    (lyricsCanvasRepository.getAITranslationLyrics(lyrics, translationLanguage).optionalValue() as? Resource.Success)?.data
                 WearLyricsResult(
                     source = "LrcLib",
                     lyrics = lyrics,
@@ -1611,7 +958,7 @@ private suspend fun fetchLyricsByProvider(
 
         DataStoreManager.YOUTUBE -> {
             val language = dataStoreManager.youtubeSubtitleLanguage.first()
-            val resource = lyricsCanvasRepository.getYouTubeCaption(language, mediaId).first()
+            val resource = lyricsCanvasRepository.getYouTubeCaption(language, mediaId).optionalValue()
             val payload = (resource as? Resource.Success)?.data
             val lyrics = payload?.first
             if (lyrics?.lines.isNullOrEmpty()) {
@@ -1799,19 +1146,26 @@ private suspend fun sendQueueHandoffToPhone(
 
 private suspend fun sendRemoteCommandToPhone(
     context: Context,
+    dataStoreManager: DataStoreManager,
     command: String,
 ): Boolean {
     val nodeId = getConnectedPhoneNodeId(context) ?: return false
+    val requestId = UUID.randomUUID().toString()
     val envelope =
         JSONObject()
-            .put("requestId", UUID.randomUUID().toString())
+            .put("requestId", requestId)
             .put("action", WearCompanionBridge.ACTION_REMOTE)
             .put(
                 "payload",
                 JSONObject().put("command", command),
             ).toString()
             .toByteArray(Charsets.UTF_8)
-    return sendCompanionEnvelopeToPhone(context, nodeId, envelope)
+    val delivered = sendCompanionEnvelopeToPhone(context, nodeId, envelope)
+    if (!delivered) return false
+    return awaitCompanionRemoteAck(
+        dataStoreManager = dataStoreManager,
+        requestId = requestId,
+    )
 }
 
 private suspend fun getConnectedPhoneNodeId(context: Context): String? {

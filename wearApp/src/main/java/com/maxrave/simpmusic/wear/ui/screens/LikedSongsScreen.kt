@@ -34,6 +34,7 @@ import com.maxrave.domain.mediaservice.handler.QueueData
 import com.maxrave.domain.repository.SongRepository
 import com.maxrave.domain.utils.toTrack
 import com.maxrave.simpmusic.wear.ui.components.WearEmptyState
+import com.maxrave.simpmusic.wear.ui.components.WearScreenHeader
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
@@ -93,23 +94,7 @@ fun LikedSongsScreen(
     }
 
     WearList(state = listState) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Liked songs",
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
+        item { WearScreenHeader("Liked songs", onBack = onBack) }
 
         if (tracks.isEmpty()) {
             item { WearEmptyState("No liked songs yet.") }

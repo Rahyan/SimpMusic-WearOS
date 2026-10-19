@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Companion.Base" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">#0B1015</item>
+        <item name="android:colorBackground">#0B1015</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+    <style name="Theme.Companion" parent="Theme.Companion.Base" />
+</resources>

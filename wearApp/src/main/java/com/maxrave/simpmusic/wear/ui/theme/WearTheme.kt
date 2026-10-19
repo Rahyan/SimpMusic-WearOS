@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 import androidx.wear.compose.material3.ColorScheme
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Shapes
@@ -49,7 +50,12 @@ fun WearTheme(content: @Composable () -> Unit) {
         dataStoreManager.putString(KEY_WEAR_ACCENT_MIGRATED, WEAR_ACCENT_MIGRATION_DONE)
     }
     val baseScheme = dynamicColorScheme(context) ?: ColorScheme()
-    val scheme = remember(baseScheme, normalizedPreset) { baseScheme.withAccentPreset(normalizedPreset) }
+    val scheme = remember(baseScheme, normalizedPreset) { baseScheme.withAccentPreset(normalizedPreset).copy(
+        background = Color.Black, surfaceContainer = Color(0xFF14191E),
+        surfaceContainerLow = Color(0xFF0D1115), surfaceContainerHigh = Color(0xFF222A31),
+        primaryContainer = Color(0xFF1A252F), onPrimaryContainer = Color(0xFFE8EEF3),
+        onSurface = Color(0xFFF0F3F6), onSurfaceVariant = Color(0xFFADB7C1),
+    ) }
     MaterialTheme(
         colorScheme = scheme,
         typography = Typography(),

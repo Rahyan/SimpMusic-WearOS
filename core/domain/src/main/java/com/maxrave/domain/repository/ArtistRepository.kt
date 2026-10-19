@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.Flow
 import java.time.LocalDateTime
 
 interface ArtistRepository {
+    suspend fun updateArtistMetadata(item: ArtistEntity)
+
     fun getAllArtists(limit: Int): Flow<List<ArtistEntity>>
 
     fun getArtistById(id: String): Flow<ArtistEntity>

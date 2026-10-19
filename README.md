@@ -1,84 +1,93 @@
 # SimpMusic-WearOS
 
-WearOS-focused fork of SimpMusic, with standalone watch playback and a Wear-native UI built with Wear Compose Material 3.
+SimpMusic for Wear OS. Search YouTube Music, play directly on your watch, and download music to take with you.
 
-## What This Repo Is
-- A fork specialized for WearOS development.
-- Not a mirror of upstream app priorities.
-- Optimized for real on-watch usage (Galaxy Watch class devices), including standalone Wi-Fi playback.
+The watch has its own player, queue, library and downloads. The Android companion handles signing in and gives you a bigger screen for controlling the watch. You can also build the full SimpMusic phone app if you want music playback on your phone too.
 
-## Current Wear Status
-- Dedicated `wearApp` module.
-- Wear screens: Discover, Home, Library, Playlist (local + YouTube), Song Details, Now Playing, Queue, Accounts, Login, Downloads, Search filters, online playlists.
-- Phone-assisted login bridge is implemented for devices where watch-side WebView is unavailable/unreliable.
-- Playback pipeline has Wear-specific reliability hardening, resolver fallback tuning, and watch battery-aware stream selection.
-- Tested on: Galaxy Watch4 Classic, WearOS 5
+## On the watch
 
-## Recent Progress (Feb 2026)
-- Immersive player + drag sheet: Controls/Lyrics/Queue tabs, scrollable expanded sheet, queue reordering/removal, and centered karaoke-style synced lyrics.
-- Lyrics upgrades: translation modes (`Original` / `Translated` / `Both`), tap-to-seek lines, and offline lyrics pinning for downloaded tracks.
-- Search + library parity: category filters (songs/playlists/artists/podcasts), deeper liked/recent/followed flows, and improved library state retention.
-- Tile + complication support: dynamic playback tile, actionable controls (prev/play-next), playback-aware complication actions.
-- Phone companion upgrades: selective sync, diagnostics/log export, remote controls, bidirectional queue handoff (phone↔watch), and background auto-sync worker.
-- Performance + battery pass: wearable battery saver mode, phone offload controls with watch-only override, delta sync signatures/stats, and charging/Wi-Fi-aware auto-sync policies.
+- Browse Discover, search for music, and open albums, artists and playlists.
+- Access liked songs, recent plays, followed artists, podcasts and local playlists.
+- An artwork-backed player with a circular progress ring, previous/next, like, audio output and volume controls. Hold play/pause to seek.
+- Pull up the player drawer for controls, lyrics and the queue. Lyrics support translation and tapping a line to seek when timings are available.
+- Download individual tracks or prepare a queue of up to 100 tracks for offline listening. The offline queue uses files verified to be fully downloaded on the watch.
+- Playback tile and complication, bezel volume control, and a battery saver option.
 
-## Wear Feature Highlights
-- **Immersive playback UX**: compact round-screen controls, marquee title, progress ring, queue/lyrics in the same sheet.
-- **Companion bridge**: watch can control phone playback, and handoff waits for explicit ack before success/pause behavior.
-- **Battery-aware operation**: reduced heavy visual work in battery saver, plus conservative watch stream probing and auto-sync policy gates.
+## Phone apps
 
-## Fresh Watch Screenshots
-| Discover | Playlists |
+There are two choices:
+
+- **Companion:** the small phone app for signing in, sending the session to your watch, controlling watch playback, managing its queue and preparing an offline queue. It doesn't play music on the phone.
+- **Full phone app:** SimpMusic's Android app with the watch bridge added. Use this if you also want phone playback, library sync and playback handoff.
+
+Choose one on your phone. They use the same application ID, so installing one replaces the other. The watch and phone apps need matching application IDs and signing certificates for the connection to work.
+
+An existing upstream SimpMusic install may have the same package name but a different signing key. Android will reject that replacement; [separate test builds](docs/building.md#separate-test-installs) let you try this fork without removing it.
+
+## Screenshots
+
+| Watch player | Queue |
 | --- | --- |
-| ![Wear Discover](asset/readme/wear-discover.png) | ![Wear Playlists](asset/readme/wear-playlists.png) |
+| <img src="asset/readme/current/watch-player.png" alt="Round watch player" width="240"> | <img src="asset/readme/current/watch-queue.png" alt="Watch queue" width="240"> |
 
-| Downloads | Search |
+| Companion player | Offline queue |
 | --- | --- |
-| ![Wear Downloads](asset/readme/wear-downloads.png) | ![Wear Search](asset/readme/wear-search.png) |
+| <img src="asset/readme/current/companion-player.png" alt="Companion player" width="260"> | <img src="asset/readme/current/companion-offline.png" alt="Companion offline queue panel" width="260"> |
 
-## Architecture Notes
-- Reuses shared core/data/media/service modules from the original app where practical.
-- Adds Wear-specific app shell, navigation, auth bridge, network binding, and UX flows.
-- Uses Wear Compose Material 3 components (not phone-style UI).
+Emulator previews using sample music and watch data. [About the screenshots](asset/readme/current/README.md).
 
-## Build
+## Install and sign in
 
-### Debug APK (Watch)
-```bash
-./gradlew_ws :wearApp:assembleDebug
+APK builds will be available on the [releases page](https://github.com/Rahyan/SimpMusic-WearOS/releases). Until then, use the source build instructions below.
+
+Choose the watch APK for your watch's Android ABI and the companion APK from the same release. The ARM universal watch APK supports both ARMv7 and ARM64, with a larger download.
+
+1. Install the watch APK on your watch, then either the companion or full app on your Android phone. Use a matching pair from the same build.
+2. Open the phone app and sign in.
+3. On the watch, open **Accounts → Sync session from phone**.
+4. Pick something to play on the watch. The companion will show its player and queue.
+
+You can browse and play as a guest too. Signing in is for your account and library.
+
+For ADB install commands, isolated test builds and signing details, see [building and installing](docs/building.md).
+
+If something breaks, [open an issue](https://github.com/Rahyan/SimpMusic-WearOS/issues/new/choose) with your watch model, Android version and app version. Please leave account cookies and tokens out of reports.
+
+## Build it yourself
+
+You need JDK 21, Android SDK 36, and the submodules. No Sentry account or release key is needed for a debug build.
+
+```sh
+git clone --recurse-submodules https://github.com/Rahyan/SimpMusic-WearOS.git
+cd SimpMusic-WearOS
+./gradlew --no-daemon :wearApp:assembleDebug :companionApp:assembleDebug
 ```
 
-APK output:
+On Windows, use `gradlew.bat` instead of `./gradlew`.
+
+The APKs are written to:
+
 ```text
 wearApp/build/outputs/apk/debug/wearApp-debug.apk
+companionApp/build/outputs/apk/debug/companionApp-debug.apk
 ```
 
-### Install on Watch
-```bash
-adb devices -l
-adb -s <watch-adb-id> install -r -t wearApp/build/outputs/apk/debug/wearApp-debug.apk
-```
+The full phone app is optional: build it with `:app:assembleFossDebug`. More build, test and release commands are in [docs/building.md](docs/building.md).
 
-Optional reset app data:
-```bash
-adb -s <watch-adb-id> shell pm clear com.maxrave.simpmusic.dev
-```
+## Compatibility
 
-## Login on Wear
-- Watch login can be initiated from the Wear app.
-- Phone handles the Web-based account flow.
-- Session/cookie is returned to the watch through Wear Data Layer.
+The companion requires Android 8.0 or newer. Watch builds are available for ARMv7 and ARM64. Hardware testing has focused on the Galaxy Watch4 Classic; reports from other watches are welcome.
 
-## Known Constraints
-- YouTube backend behavior changes over time and can break stream extraction paths.
-- WearOS networking is less stable than phone networking (Bluetooth proxy, Wi-Fi handoffs, radio wakeups).
-- Some heavy phone features are still being ported/tuned for watch hardware limits.
+Playback and sign-in depend on YouTube's services and can break when YouTube changes them.
 
-## Roadmap
-- Path A: UI/UX stabilization and polish.
-- Path B: feature parity pass (search, richer queue actions, improved startup session handling).
-- Path C: larger standalone features (downloads/offline, deeper library workflows).
+## About this fork
 
-## Upstream
-- Upstream project: `maxrave-dev/SimpMusic`
-- This fork intentionally diverges in implementation details and priorities for WearOS.
+This fork adds a Wear OS app and Android companion to SimpMusic. It uses the Android codebase, with selected fixes adapted from upstream's multiplatform project. [Upstream notes](docs/upstream-compatibility.md) track those changes and the differences between the projects.
+
+## Credits
+
+Built on [SimpMusic](https://github.com/maxrave-dev/SimpMusic) by maxrave-dev and its contributors. The shared media and extraction code also relies on the projects credited upstream, including [NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor) and [SmartTube](https://github.com/yuliskov/SmartTube).
+
+This is an unofficial YouTube Music client. It isn't affiliated with Google or YouTube.
+
+[GPL-3.0 license](LICENSE).

@@ -42,6 +42,7 @@ interface MediaPlayerInterface {
     )
 
     fun removeMediaItem(index: Int)
+    fun removeMediaItems(fromIndex: Int, toIndex: Int)
 
     fun moveMediaItem(
         fromIndex: Int,

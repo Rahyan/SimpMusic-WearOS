@@ -26,6 +26,8 @@ internal class AlbumRepositoryImpl(
     private val localDataSource: LocalDataSource,
     private val youTube: YouTube,
 ) : AlbumRepository {
+    override suspend fun updateAlbumMetadata(item: AlbumEntity) = withContext(Dispatchers.IO) { localDataSource.updateAlbumMetadata(item) }
+
     override fun getAllAlbums(limit: Int): Flow<List<AlbumEntity>> =
         flow {
             emit(localDataSource.getAllAlbums(limit))
@@ -58,7 +60,7 @@ internal class AlbumRepositoryImpl(
     override suspend fun updateAlbumLiked(
         albumId: String,
         likeStatus: Int,
-    ) = withContext(Dispatchers.Main) { localDataSource.updateAlbumLiked(likeStatus, albumId) }
+    ) = withContext(Dispatchers.IO) { localDataSource.updateAlbumLiked(likeStatus, albumId); com.maxrave.common.LocalLibraryEdits.changed("albums", albumId, likeStatus == 1) }
 
     override suspend fun updateAlbumInLibrary(
         inLibrary: LocalDateTime,

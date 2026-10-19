@@ -45,6 +45,7 @@ import com.maxrave.domain.repository.CacheRepository
 import com.maxrave.domain.repository.SongRepository
 import com.maxrave.domain.utils.toTrack
 import com.maxrave.simpmusic.wear.ui.components.WearEmptyState
+import com.maxrave.simpmusic.wear.ui.components.WearScreenHeader
 import com.maxrave.simpmusic.wear.ui.components.WearList
 import com.maxrave.simpmusic.wear.ui.components.WearLoadingState
 import kotlinx.coroutines.launch
@@ -98,26 +99,32 @@ fun DownloadsScreen(
         return
     }
 
+    val offlineStore = remember { com.maxrave.simpmusic.wear.offline.OfflineQueue(context.applicationContext) }
+    val offline by androidx.compose.runtime.produceState<com.maxrave.common.WatchOfflinePack?>(null, downloadHandler) {
+        while (true) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { offlineStore.status(downloadHandler) }
+            kotlinx.coroutines.delay(5_000)
+        }
+    }
+
     val lowStorage = storage.freeBytes in 1 until LOW_STORAGE_THRESHOLD_BYTES
 
     WearList(state = listState) {
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                }
-                Text(
-                    text = "Downloads",
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
+        item { WearScreenHeader("Downloads", onBack = onBack) }
+        offline?.let { pack -> item {
+            com.maxrave.simpmusic.wear.ui.components.OfflineQueueCard(pack,
+                onPlay = { scope.launch {
+                    try { offlineStore.play(mediaPlayerHandler); openNowPlaying() }
+                    catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (_: Exception) { Toast.makeText(context, "Offline tracks are not ready yet.", Toast.LENGTH_SHORT).show() }
+                } },
+                onRetry = { scope.launch {
+                    try { offlineStore.retry(offlineStore.chargingOnly()) }
+                    catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (_: Exception) { Toast.makeText(context, "Couldn’t schedule downloads. Try again.", Toast.LENGTH_SHORT).show() }
+                } })
+        } }
+
 
         item {
             Text(
@@ -269,7 +276,7 @@ private fun SongRow(
                     shape = RoundedCornerShape(16.dp),
                 ).border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.primaryDim.copy(alpha = 0.75f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f),
                     shape = RoundedCornerShape(16.dp),
                 ).padding(horizontal = 10.dp, vertical = 10.dp),
     ) {

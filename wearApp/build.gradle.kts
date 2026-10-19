@@ -4,6 +4,9 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
+val wearChannelApplicationId =
+    providers.gradleProperty("simpmusic.wear.applicationId").orElse("com.maxrave.simpmusic").get()
+
 kotlin {
     jvmToolchain(21)
     compilerOptions {
@@ -20,18 +23,30 @@ android {
     defaultConfig {
         // Use the same package name as the phone app so Wear Data Layer messages can be delivered.
         // (Data Layer comms are scoped per-app package.)
-        applicationId = "com.maxrave.simpmusic"
+        applicationId = wearChannelApplicationId
         minSdk = 26
         targetSdk = 36
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = libs.versions.version.code.get().toInt()
         versionName = libs.versions.version.name.get()
 
         // Keep it simple for the first buildable Wear target.
         vectorDrawables.useSupportLibrary = true
+        // Explicit ABI overrides also allow 4 KB emulator builds during development.
+        providers.gradleProperty("simpmusic.wear.abis").orNull?.let { abis ->
+            val requested = abis.split(',').filter { it.isNotBlank() }
+            require(requested.isNotEmpty() && requested.all { it in setOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64") })
+            ndk.abiFilters.addAll(requested)
+        }
     }
 
     buildTypes {
         release {
+            // Physical watches use ARM. The retained x86_64 V8 binary requires 4 KB pages;
+            // exclude emulator ABIs from releases unless the caller explicitly requests them.
+            if (!providers.gradleProperty("simpmusic.wear.abis").isPresent) {
+                ndk.abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -71,6 +86,8 @@ android {
 }
 
 dependencies {
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.espresso.core)
     coreLibraryDesugaring(libs.desugaring)
 
     val composeBom = platform(libs.compose.bom)
@@ -97,6 +114,8 @@ dependencies {
     implementation(libs.material)
     // Wear Data Layer (phone-assisted login, etc.)
     implementation(libs.play.services.wearable)
+    implementation(libs.work.runtime.ktx)
+    implementation(libs.kotlinx.serialization.json)
 
     // DI (data layer is wired via Koin; dependency is not exposed transitively).
     implementation(platform(libs.koin.bom))
@@ -111,4 +130,6 @@ dependencies {
 
     debugImplementation(libs.ui.tooling)
     debugImplementation(libs.wear.compose.ui.tooling)
+    testImplementation(libs.junit)
+    testImplementation(libs.org.json)
 }
