@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.wear.compose.material3.ButtonDefaults
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.Icon
@@ -68,6 +69,7 @@ fun DownloadsScreen(
     val preparing by songRepository.getPreparingSongs().collectAsStateWithLifecycle(initialValue = emptyList())
     val listState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() }
     var selectedSong by remember { mutableStateOf<SongEntity?>(null) }
+    var showOfflinePlaylists by rememberSaveable { mutableStateOf(false) }
     var refreshNonce by remember { mutableIntStateOf(0) }
     var storage by remember { mutableStateOf(context.readStorageSnapshot()) }
     var downloadCacheBytes by remember { mutableLongStateOf(0L) }
@@ -75,6 +77,11 @@ fun DownloadsScreen(
     val active = (preparing + downloading.orEmpty()).distinctBy { it.videoId }
     val finished = downloaded.orEmpty().distinctBy { it.videoId }
     val allKnownSongs = (active + finished).distinctBy { it.videoId }
+
+    if (showOfflinePlaylists) {
+        OfflinePlaylistsScreen(mediaPlayerHandler, { showOfflinePlaylists = false }, openNowPlaying)
+        return
+    }
 
     LaunchedEffect(active.size, finished.size, refreshNonce) {
         storage = context.readStorageSnapshot()
@@ -100,10 +107,13 @@ fun DownloadsScreen(
     }
 
     val offlineStore = remember { com.maxrave.simpmusic.wear.offline.OfflineQueue(context.applicationContext) }
-    val offline by androidx.compose.runtime.produceState<com.maxrave.common.WatchOfflinePack?>(null, downloadHandler) {
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    val offline by androidx.compose.runtime.produceState<com.maxrave.common.WatchOfflinePack?>(null, downloadHandler, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
         while (true) {
             value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { offlineStore.status(downloadHandler) }
             kotlinx.coroutines.delay(5_000)
+        }
         }
     }
 
@@ -111,6 +121,9 @@ fun DownloadsScreen(
 
     WearList(state = listState) {
         item { WearScreenHeader("Downloads", onBack = onBack) }
+        item { androidx.wear.compose.material3.OutlinedButton(onClick = { showOfflinePlaylists = true }, modifier = Modifier.fillMaxWidth()) {
+            Text("Offline playlists")
+        } }
         offline?.let { pack -> item {
             com.maxrave.simpmusic.wear.ui.components.OfflineQueueCard(pack,
                 onPlay = { scope.launch {

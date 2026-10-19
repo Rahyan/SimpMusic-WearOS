@@ -133,6 +133,11 @@ fun YtPlaylistScreen(
 
         when (playlistRes) {
             is Resource.Success -> {
+                if (tracks.isNotEmpty()) item {
+                    if (playlist?.isComplete == true) KeepPlaylistOffline(playlistId, title, tracks)
+                    else Text("Some playlist details are unavailable. Individual tracks can still be downloaded.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (tracks.isEmpty()) {
                     item {
                         Spacer(Modifier.height(10.dp))

@@ -139,7 +139,7 @@ internal class DownloadUtils(
             maxParallelDownloads = if (context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_WATCH)) 2 else 20
             minRetryCount = 3
             if (context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_WATCH) &&
-                context.getSharedPreferences("watch_download_policy", Context.MODE_PRIVATE).getBoolean("charging", false)) {
+                context.getSharedPreferences("watch_download_policy", Context.MODE_PRIVATE).getBoolean("charging", true)) {
                 setRequirements(androidx.media3.exoplayer.scheduler.Requirements(
                     androidx.media3.exoplayer.scheduler.Requirements.NETWORK_UNMETERED or androidx.media3.exoplayer.scheduler.Requirements.DEVICE_CHARGING))
             }
@@ -168,7 +168,9 @@ internal class DownloadUtils(
         title: String,
         thumbnail: String,
         audioOnly: Boolean,
+        automatic: Boolean,
     ) {
+        if (!automatic) com.maxrave.common.WatchOfflineDownloadEvents.onManualDownload?.invoke(videoId)
         var isVideo = false
         if (!audioOnly && dataStoreManager.watchVideoInsteadOfPlayingAudio.first() == DataStoreManager.TRUE) {
             val request = ImageRequest.Builder(context).data(thumbnail).diskCachePolicy(CachePolicy.ENABLED).build()
@@ -221,6 +223,20 @@ internal class DownloadUtils(
         ready
     }
 
+    override suspend fun audioDownloadInventory(): Map<String, DownloadHandler.AudioDownload> =
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            buildMap {
+                downloadManager.downloadIndex.getDownloads().use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val value = cursor.download
+                        if (!value.request.id.startsWith(MERGING_DATA_TYPE.VIDEO)) {
+                            put(value.request.id, DownloadHandler.AudioDownload(value.state, value.bytesDownloaded, value.contentLength))
+                        }
+                    }
+                }
+            }
+        }
+
     override suspend fun setWatchDownloadPolicy(chargingOnly: Boolean) {
         kotlinx.coroutines.withContext(Dispatchers.IO) {
             check(context.getSharedPreferences("watch_download_policy", Context.MODE_PRIVATE)
@@ -231,6 +247,7 @@ internal class DownloadUtils(
                 androidx.media3.exoplayer.scheduler.Requirements.DEVICE_CHARGING else androidx.media3.exoplayer.scheduler.Requirements.NETWORK
             downloadManager.setRequirements(androidx.media3.exoplayer.scheduler.Requirements(flags))
         }
+        com.maxrave.common.WatchOfflineDownloadEvents.onPolicyChanged?.invoke()
     }
 
     override fun removeDownload(videoId: String) {

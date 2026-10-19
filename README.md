@@ -11,6 +11,7 @@ The watch has its own player, queue, library and downloads. The Android companio
 - An artwork-backed player with a circular progress ring, previous/next, like, audio output and volume controls. Hold play/pause to seek.
 - Pull up the player drawer for controls, lyrics and the queue. Lyrics support translation and tapping a line to seek when timings are available.
 - Download individual tracks or prepare a queue of up to 100 tracks for offline listening. The offline queue uses files verified to be fully downloaded on the watch.
+- Keep playlists offline with automatic refresh, an estimated download budget and optional cleanup. Manage them from Downloads. [Offline playlist guide](docs/offline-playlists.md).
 - Playback tile and complication, bezel volume control, and a battery saver option.
 
 ## Phone apps

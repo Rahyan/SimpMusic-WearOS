@@ -62,6 +62,14 @@ class WearSimpMusicApplication : Application() {
                 onPlaybackCreated = { playbackHandler = it },
             )
         }
+        val offlinePlaylists = com.maxrave.simpmusic.wear.offline.OfflinePlaylists(this)
+        com.maxrave.common.WatchOfflineDownloadEvents.onManualDownload = { offlinePlaylists.manualDownload(it) }
+        com.maxrave.common.WatchOfflineDownloadEvents.onPolicyChanged = { offlinePlaylists.requestRefresh() }
+        startupScope.launch {
+            try { offlinePlaylists.ensureScheduled() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { Logger.w("OfflinePlaylists", "Could not restore the refresh schedule") }
+        }
         startupScope.launch {
             runCatching {
                 val koin = GlobalContext.get()
@@ -86,4 +94,10 @@ class WearSimpMusicApplication : Application() {
         super.onTerminate()
     }
 
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
+            com.maxrave.simpmusic.wear.offline.OfflinePlaylists.trimMemory()
+        }
+    }
 }

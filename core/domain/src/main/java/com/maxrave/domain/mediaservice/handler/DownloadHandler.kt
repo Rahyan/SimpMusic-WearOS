@@ -8,11 +8,13 @@ interface DownloadHandler {
         title: String,
         thumbnail: String,
         audioOnly: Boolean = false,
+        automatic: Boolean = false,
     )
 
     /** Verify completed audio against the actual cache, not imported song metadata. */
     suspend fun completedAudioIds(): Set<String>
     suspend fun setWatchDownloadPolicy(chargingOnly: Boolean)
+    suspend fun audioDownloadInventory(): Map<String, AudioDownload>
 
     fun removeDownload(videoId: String)
 
@@ -50,4 +52,6 @@ interface DownloadHandler {
     data class Download(
         val state: Int,
     )
+
+    data class AudioDownload(val state: Int, val bytes: Long, val contentLength: Long)
 }
