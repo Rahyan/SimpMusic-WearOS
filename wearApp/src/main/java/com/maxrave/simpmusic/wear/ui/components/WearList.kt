@@ -33,6 +33,8 @@ fun WearList(
     // Leave room for `TimeText()` in `AppScaffold`.
     contentPadding: PaddingValues = PaddingValues(start = 16.dp, end = 16.dp, top = 34.dp, bottom = 46.dp),
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(8.dp),
+    showClockScrim: Boolean = true,
+    showScrollIndicator: Boolean = true,
     content: LazyListScope.() -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -59,14 +61,18 @@ fun WearList(
         )
 
         // Keep scrolled content from showing through the clock's reserved top inset.
-        val background = MaterialTheme.colorScheme.background
-        Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(34.dp).background(
-            Brush.verticalGradient(0f to background, .65f to background, 1f to background.copy(alpha = 0f)),
-        ))
+        if (showClockScrim) {
+            val background = MaterialTheme.colorScheme.background
+            Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(34.dp).background(
+                Brush.verticalGradient(0f to background, .65f to background, 1f to background.copy(alpha = 0f)),
+            ))
+        }
 
-        ScrollIndicator(
-            state = state,
-            modifier = Modifier.align(Alignment.CenterEnd),
-        )
+        if (showScrollIndicator) {
+            ScrollIndicator(
+                state = state,
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
+        }
     }
 }

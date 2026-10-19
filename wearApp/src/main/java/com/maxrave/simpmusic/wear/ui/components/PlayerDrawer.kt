@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.material3.ScrollIndicator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -136,7 +137,7 @@ fun PlayerDrawer(state: PlayerDrawerState, listState: LazyListState, color: Colo
                     }
                 }
             }
-            Column(Modifier.fillMaxSize().graphicsLayer { translationY = height * (1f - state.fraction) }
+            Box(Modifier.fillMaxSize().graphicsLayer { translationY = height * (1f - state.fraction) }
                 .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)).background(color)
                 .pointerInput(touchContact) {
                     // A rotary scroll at the list boundary must not pull the drawer closed.
@@ -150,17 +151,22 @@ fun PlayerDrawer(state: PlayerDrawerState, listState: LazyListState, color: Colo
                     }
                 }
                 .semantics { paneTitle = "Player controls" }) {
-                // Keep a generous, fixed handle target even when lyrics/the queue are scrolled.
-                Box(Modifier.fillMaxWidth().height(44.dp).then(drag)
-                    .clickable(role = Role.Button, onClickLabel = "Close player controls") { state.moveTo(scope, false) }
-                    .semantics { contentDescription = "Player drawer handle" }
-                    .padding(top = 22.dp), contentAlignment = Alignment.Center) {
-                    Box(Modifier.width(28.dp).height(4.dp).clip(RoundedCornerShape(2.dp))
-                        .background(Color.White.copy(alpha = .65f)))
+                Column(Modifier.fillMaxSize()) {
+                    // Keep a generous, fixed handle target even when lyrics/the queue are scrolled.
+                    Box(Modifier.fillMaxWidth().height(44.dp).then(drag)
+                        .clickable(role = Role.Button, onClickLabel = "Close player controls") { state.moveTo(scope, false) }
+                        .semantics { contentDescription = "Player drawer handle" }
+                        .padding(top = 22.dp), contentAlignment = Alignment.Center) {
+                        Box(Modifier.width(28.dp).height(4.dp).clip(RoundedCornerShape(2.dp))
+                            .background(Color.White.copy(alpha = .65f)))
+                    }
+                    WearList(Modifier.weight(1f).nestedScroll(connection),
+                        state = listState, contentPadding = PaddingValues(start = sidePadding, end = sidePadding, bottom = 26.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp), showClockScrim = false,
+                        showScrollIndicator = false, content = content)
                 }
-                WearList(Modifier.weight(1f).padding(horizontal = sidePadding).nestedScroll(connection),
-                    state = listState, contentPadding = PaddingValues(top = 0.dp, bottom = 26.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
+                // The arc follows the full round display, independently of the handle/content insets.
+                ScrollIndicator(state = listState, modifier = Modifier.align(Alignment.CenterEnd))
             }
         }
     }
