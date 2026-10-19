@@ -13,7 +13,7 @@ data class AccountSwitcherEndpointResponse(
     @Serializable
     data class Data(
         val actions: List<Action?>?,
-        val contents: List<Action.GetMultiPageMenuAction.Menu.MultiPageMenuRenderer.Section>?,
+        val contents: List<Action.GetMultiPageMenuAction.Menu.MultiPageMenuRenderer.Section?>?,
         val responseContext: ResponseContext?,
         val selectText: SelectText?,
     ) {
@@ -175,13 +175,17 @@ data class AccountSwitcherEndpointResponse(
                                             ) {
                                                 @Serializable
                                                 data class AccountByline(
-                                                    val simpleText: String,
+                                                    val simpleText: String? = null,
+                                                    val runs: List<Run?>? = null,
                                                 )
 
                                                 @Serializable
                                                 data class AccountName(
-                                                    val simpleText: String,
-                                                )
+                                                    val simpleText: String? = null,
+                                                    val runs: List<Run?>? = null,
+                                                ) {
+                                                    fun text(): String? = accountText(simpleText, runs)
+                                                }
 
                                                 @Serializable
                                                 data class AccountPhoto(
@@ -190,8 +194,11 @@ data class AccountSwitcherEndpointResponse(
 
                                                 @Serializable
                                                 data class ChannelHandle(
-                                                    val simpleText: String,
-                                                )
+                                                    val simpleText: String? = null,
+                                                    val runs: List<Run?>? = null,
+                                                ) {
+                                                    fun text(): String? = accountText(simpleText, runs)
+                                                }
 
                                                 @Serializable
                                                 data class MobileBanner(
@@ -210,8 +217,8 @@ data class AccountSwitcherEndpointResponse(
 
                                                 fun toAccountInfo(email: String): AccountInfo? {
                                                     return AccountInfo(
-                                                        name = accountName?.simpleText ?: return null,
-                                                        email = email,
+                                                        name = accountName?.text() ?: return null,
+                                                        email = email.trim().takeIf { it.isNotEmpty() } ?: return null,
                                                         pageId =
                                                             onBehalfOfParameter
                                                                 ?: serviceEndpoint
@@ -347,29 +354,24 @@ data class SelectActiveIdentityEndpoint(
 }
 
 fun AccountSwitcherEndpointResponse.toListAccountInfo(): List<AccountInfo> {
-    if (this.code == "SUCCESS" && this.data != null) {
-        val list = mutableListOf<AccountInfo>()
-        this.data.contents
-            ?.firstOrNull()
-            ?.accountSectionListRenderer
-            ?.contents
-            ?.firstOrNull()
-            ?.accountItemSectionRenderer
-            ?.contents
-            ?.forEach { content ->
-                content?.accountItem?.let { accountItem ->
-                    accountItem
-                        .toAccountInfo(
-                            email =
-                                accountItem.channelHandle
-                                    ?.simpleText ?: "",
-                        )?.let {
-                            list.add(it)
-                        }
-                }
-            }
-        return list
-    } else {
-        return emptyList()
+    val response = data?.takeIf { code == "SUCCESS" } ?: return emptyList()
+    val sections = response.contents.orEmpty() + response.actions.orEmpty().flatMap {
+        it?.getMultiPageMenuAction?.menu?.multiPageMenuRenderer?.sections.orEmpty()
     }
+    return sections.flatMap { section ->
+        val accounts = section?.accountSectionListRenderer ?: return@flatMap emptyList()
+        val headerEmail = accounts.header?.googleAccountHeaderRenderer?.email?.runs
+            ?.filterNotNull()?.joinToString("") { it.text }.orEmpty()
+        accounts.contents.orEmpty().flatMap { content ->
+            content?.accountItemSectionRenderer?.contents.orEmpty().mapNotNull { item ->
+                val account = item?.accountItem?.takeUnless { it.isDisabled == true } ?: return@mapNotNull null
+                val identifier = account.channelHandle?.text() ?: headerEmail
+                account.toAccountInfo(identifier)?.let { it to (account.isSelected == true) }
+            }
+        }
+    }.sortedByDescending { it.second }.map { it.first }.distinctBy { it.email to it.pageId }
 }
+
+private fun accountText(simpleText: String?, runs: List<Run?>?): String? =
+    simpleText?.trim()?.takeIf { it.isNotEmpty() }
+        ?: runs?.filterNotNull()?.joinToString("") { it.text }?.trim()?.takeIf { it.isNotEmpty() }

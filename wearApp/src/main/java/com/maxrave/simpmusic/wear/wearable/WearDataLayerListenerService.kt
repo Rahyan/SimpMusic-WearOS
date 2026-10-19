@@ -43,7 +43,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
@@ -68,6 +69,18 @@ class WearDataLayerListenerService : WearableListenerService() {
         super.onDestroy()
     }
 
+    private fun handleEvent(block: suspend CoroutineScope.() -> Unit) {
+        // GMS invokes these callbacks on its background handler. Keep bounded work inside
+        // the callback so listener unbinding cannot cancel a refresh before it replies.
+        try {
+            runBlocking(scope.coroutineContext) { withTimeout(40_000, block) }
+        } catch (_: CancellationException) {
+            Logger.w("WearCompanion", "Data Layer callback cancelled or timed out")
+        } catch (error: Exception) {
+            Logger.w("WearCompanion", "Data Layer callback failed: ${error.javaClass.simpleName}")
+        }
+    }
+
     override fun onMessageReceived(messageEvent: MessageEvent) {
         when (messageEvent.path) {
             PATH_LOGIN_COOKIE -> onCookie(messageEvent)
@@ -85,7 +98,7 @@ class WearDataLayerListenerService : WearableListenerService() {
         val msg = parts.getOrNull(1).orEmpty()
         if (status.isBlank() && msg.isBlank()) return
 
-        scope.launch {
+        handleEvent {
             val dataStoreManager: DataStoreManager = GlobalContext.get().get()
             if (status.isNotBlank()) {
                 dataStoreManager.putString(KEY_WEAR_LOGIN_STATUS, status)
@@ -99,7 +112,7 @@ class WearDataLayerListenerService : WearableListenerService() {
         val cookie = runCatching { messageEvent.data?.decodeToString() }.getOrNull()
         if (cookie.isNullOrBlank()) return
 
-        scope.launch {
+        handleEvent {
             val dataStoreManager: DataStoreManager = GlobalContext.get().get()
             val accountRepository: AccountRepository = GlobalContext.get().get()
             val commonRepository: CommonRepository = GlobalContext.get().get()
@@ -147,10 +160,10 @@ class WearDataLayerListenerService : WearableListenerService() {
         val payload = envelope.optJSONObject("payload") ?: JSONObject()
         if (requestId.isBlank() || requestId.length > 128 || action.length > 64 || raw.length > 100_000) return
 
-        scope.launch {
+        handleEvent {
             if (action == WearCompanionBridge.ACTION_PLAYBACK_STATE) {
                 sendCompanionResponse(sourceNodeId, requestId, action, true, "", playbackData())
-                return@launch
+                return@handleEvent
             }
             requestMutex.withLock {
             val replayKey = "$sourceNodeId:$requestId:$action"
@@ -204,7 +217,7 @@ class WearDataLayerListenerService : WearableListenerService() {
     private fun onCompanionResponse(messageEvent: MessageEvent) {
         val payload = runCatching { messageEvent.data.decodeToString() }.getOrNull().orEmpty()
         if (payload.isBlank()) return
-        scope.launch {
+        handleEvent {
             val dataStoreManager: DataStoreManager = GlobalContext.get().get()
             dataStoreManager.putString(WearCompanionBridge.KEY_LAST_RESPONSE, payload)
             val response = runCatching { JSONObject(payload) }.getOrNull()

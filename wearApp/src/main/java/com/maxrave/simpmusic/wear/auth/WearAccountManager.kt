@@ -7,6 +7,8 @@ import com.maxrave.domain.manager.DataStoreManager
 import com.maxrave.domain.repository.AccountRepository
 import com.maxrave.domain.repository.CommonRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.lastOrNull
@@ -139,9 +141,12 @@ class WearAccountManager(
                 dataStoreManager.putString(com.maxrave.common.WearCompanionBridge.KEY_WEAR_EXPLICIT_LOGOUT, DataStoreManager.FALSE)
                 dataStoreManager.setCookie(cookie, accountInfoList.first().pageId)
                 true
-            } catch (_: Throwable) {
-                dataStoreManager.setCookie(currentCookie, currentPageId)
-                dataStoreManager.setLoggedIn(currentLoggedIn)
+            } catch (error: Exception) {
+                withContext(NonCancellable) {
+                    dataStoreManager.setCookie(currentCookie, currentPageId)
+                    dataStoreManager.setLoggedIn(currentLoggedIn)
+                }
+                if (error is CancellationException) throw error
                 false
             }
         }
