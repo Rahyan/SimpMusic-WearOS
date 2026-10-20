@@ -10,3 +10,5 @@ The geometric album artwork is the project's preview asset. Music, watch connect
 To refresh these, install matching debug builds on emulators, launch `WearPreviewActivity` with `--es mode player` or `--es mode queue`, and launch `CompanionPreviewActivity` for the dashboard. Disable Android's **Show taps** and **Pointer location** options before capturing with `adb exec-out screencap -p`. Capture the companion player promptly: its sample expires like a real stale playback snapshot. Scroll down for the offline panel.
 
 Replace these files when the UI changes, and update this note with the capture date and whether real devices or previews were used.
+
+[WearCapture](https://github.com/Rahyan/WearCapture) can capture and stitch scrolling watch screens over local ADB. It is useful for library, downloads and settings captures. Follow its capture/profile instructions and inspect the stitched result before adding it here. Record which images were made with it when replacing this gallery; the current previews were captured directly with ADB.

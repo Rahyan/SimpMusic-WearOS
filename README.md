@@ -37,6 +37,8 @@ This fork uses its own package name, `io.github.rahyan.simpmusicwear`, and can b
 
 Emulator previews using sample music and watch data. [About the screenshots](asset/readme/current/README.md).
 
+For scrolling Wear OS screenshots, [WearCapture](https://github.com/Rahyan/WearCapture) captures and stitches watch screens over local ADB, with a desktop app and CLI.
+
 ## Install and sign in
 
 APK builds will be available on the [releases page](https://github.com/Rahyan/SimpMusic-WearOS/releases). Until then, use the source build instructions below.
