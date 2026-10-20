@@ -52,7 +52,7 @@ Captured on a Galaxy Watch4 Classic and Galaxy S23. The two scrolling watch view
 
 ## Install and sign in
 
-APK builds will be available on the [releases page](https://github.com/Rahyan/SimpMusic-WearOS/releases). Until then, use the source build instructions below.
+Download the watch and companion APKs from the [releases page](https://github.com/Rahyan/SimpMusic-WearOS/releases).
 
 Choose the watch APK for your watch's Android ABI and the companion APK from the same release. The ARM universal watch APK supports both ARMv7 and ARM64, with a larger download.
 
