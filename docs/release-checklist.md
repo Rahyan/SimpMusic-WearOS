@@ -6,8 +6,8 @@ Status for `0.3.0-beta.1` (version code 41), updated October 19, 2026.
 
 ## Build and tests
 
-- [x] Validate the domain, common, scraper, watch, companion and full-phone Foss unit suites: 94 regression cases. The affected scraper and watch suites pass all 42 tests; the final sheet changes also pass the watch suite.
-- [x] Run the release-tool suite: 14 tests pass, including artifact integrity, public package identity and draft-only creation.
+- [x] Validate the domain, common, scraper, watch, companion and full-phone Foss unit suites: 103 regression cases. The latest affected common, scraper, watch and companion run passes all 99 cases, including nine phone-update regressions.
+- [x] Run the release-tool suite: 15 tests pass, including artifact integrity, public package identity, retained signing certificate and draft-only creation.
 - [x] Compile both Foss and Full phone Kotlin variants.
 - [x] Build watch and companion debug APKs, instrumentation APKs and minified release APKs.
 - [x] Run watch and companion debug/release lint; review remaining warnings.
@@ -31,15 +31,16 @@ There are no lint errors or fatal issues. Emulator input checks supplement the p
 - [x] Confirm release APKs are non-debuggable and exclude preview activities.
 - [x] Verify session-containing app data is excluded from Android backup and device transfer.
 - [x] Exercise package/version/certificate checks, checksums and rejection of test packages, debug keys, mismatched pairs and stale output directories.
-- [ ] Sign final public APKs with the retained production key and confirm watch/phone package names and certificates match.
-- [ ] Back up the signing key and credentials securely; configure repository signing secrets.
-- [ ] Verify hashes and the release manifest against the exact APKs to be uploaded.
+- [x] Sign the public APK candidates with the retained production key and confirm watch/phone package names and certificates match.
+- [x] Verify an independent encrypted signing-key backup and save its recovery password separately.
+- [ ] Configure repository signing secrets before using the hosted release workflow.
+- [x] Verify hashes and the release manifest against the four locally packaged APK candidates.
 
 ## Physical-device validation
 
 Use minified APKs signed with the same key on the watch and phone.
 
-Completed checks used an isolated minified build on a Galaxy Watch4 Classic (API 34, ARMv7) paired with a Galaxy S23 (API 34). Public APK signing and upload verification remain separate checks above.
+Completed checks used minified builds on a Galaxy Watch4 Classic (API 34, ARMv7) paired with a Galaxy S23 (API 34). Earlier checks used an isolated package; the public package pair has also been installed, signed in and connected successfully. It streamed music and handled a companion Pause command. The extended public-package playback and offline checks remain open below.
 
 - [x] Search and stream as a guest, seek forward and continue to the next queued track without a playback error.
 - [ ] Repeat sustained streaming, buffering and retry checks with a signed-in account.
@@ -61,12 +62,15 @@ Completed checks used an isolated minified build on a Galaxy Watch4 Classic (API
 - [x] Start watch playback from the phone with the watch UI closed and confirm its media session remains active.
 - [ ] Repeat remote playback after the watch process has been reclaimed.
 - [x] Sign out on the watch, confirm Guest mode after relaunch, then restore the session from the companion with an applied acknowledgement.
-- [ ] Complete fresh Google sign-in and the full phone/watch sign-out and revoke flow.
+- [x] Complete fresh Google sign-in and acknowledge session synchronization on the public watch/companion package pair.
+- [ ] Complete the full phone/watch sign-out and revoke flow.
 - [ ] Check stale remote commands, queue ordering and library synchronization with local watch changes.
 - [ ] Check restricted/unavailable media and useful error/retry behavior.
-- [ ] Measure cold start, player frame behavior and memory use.
+- [ ] Measure watch cold start, player frame behavior and memory use. The companion's three measured cold activity launches were 154–158 ms; that does not measure watch performance.
 - [x] Update the isolated test apps in place and retain their session and verified offline download.
 - [ ] Install over the previous publicly supported version with its retained signing key and verify settings, library and downloads.
+
+The new fork package is a separate install from older packages. Their data is not transferred automatically. The signed public candidates install alongside the original apps; an in-place public-package update with persisted downloads still needs verification.
 
 ## Publication
 

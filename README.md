@@ -27,15 +27,15 @@ This fork uses its own package name, `io.github.rahyan.simpmusicwear`, and can b
 
 ## Screenshots
 
-| Watch player | Queue |
+| Watch player | Player controls |
 | --- | --- |
-| <img src="asset/readme/current/watch-player.png" alt="Round watch player" width="240"> | <img src="asset/readme/current/watch-queue.png" alt="Watch queue" width="240"> |
+| <img src="asset/readme/current/watch-player.png" alt="Watch playing Instant Crush" width="240"> | <img src="asset/readme/current/watch-controls.png" alt="Watch player drawer controls" width="240"> |
 
-| Companion player | Offline queue |
+| Companion player | Playback and offline controls |
 | --- | --- |
 | <img src="asset/readme/current/companion-player.png" alt="Companion player" width="260"> | <img src="asset/readme/current/companion-offline.png" alt="Companion offline queue panel" width="260"> |
 
-Emulator previews using sample music and watch data. [About the screenshots](asset/readme/current/README.md).
+Captured on a Galaxy Watch4 Classic and Galaxy S23. Watch screenshots captured with [WearCapture](https://github.com/Rahyan/WearCapture). [Capture details](asset/readme/current/README.md).
 
 ## Install and sign in
 
