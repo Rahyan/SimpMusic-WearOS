@@ -852,41 +852,27 @@ class SharedViewModel(
     val updateResponse: StateFlow<UpdateData?> = _updateResponse
 
     fun checkForUpdate() {
+        if (!_isCheckingUpdate.compareAndSet(false, true)) return
         viewModelScope.launch {
-            _isCheckingUpdate.value = true
-            val updateChannel = dataStoreManager.updateChannel.first()
-            dataStoreManager.putString(
-                "CheckForUpdateAt",
-                System.currentTimeMillis().toString(),
-            )
-            if (updateChannel == DataStoreManager.GITHUB) {
-                updateRepository.checkForGithubReleaseUpdate().collectLatest { response ->
-                    val data = response.data
+            _updateResponse.value = null
+            showedUpdateDialog = false
+            try {
+                dataStoreManager.putString("CheckForUpdateAt", System.currentTimeMillis().toString())
+                updateRepository.checkForGithubReleaseUpdate(
+                    com.maxrave.simpmusic.utils.VersionManager.getVersionName(),
+                    com.maxrave.simpmusic.BuildConfig.FLAVOR,
+                    android.os.Build.SUPPORTED_ABIS.toList(),
+                ).collectLatest { response ->
                     when (response) {
-                        is Resource.Success if (data != null) -> {
-                            _updateResponse.value = data
-                            showedUpdateDialog = true
+                        is Resource.Success -> {
+                            _updateResponse.value = response.data
+                            showedUpdateDialog = response.data != null
                         }
-                        else -> {
-                            log("Check for update error: ${response.message}", Log.WARN)
-                        }
+                        is Resource.Error -> log("Check for update error: ${response.message}", Log.WARN)
                     }
-                    _isCheckingUpdate.value = false
                 }
-            } else if (updateChannel == DataStoreManager.FDROID) {
-                updateRepository.checkForFdroidUpdate().collectLatest { response ->
-                    val data = response.data
-                    when (response) {
-                        is Resource.Success if (data != null) -> {
-                            _updateResponse.value = data
-                            showedUpdateDialog = true
-                        }
-                        else -> {
-                            log("Check for update error: ${response.message}", Log.WARN)
-                        }
-                    }
-                    _isCheckingUpdate.value = false
-                }
+            } finally {
+                _isCheckingUpdate.value = false
             }
         }
     }

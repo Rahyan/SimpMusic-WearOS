@@ -127,8 +127,6 @@ class SettingsViewModel(
     val proxyPort: StateFlow<Int> = _proxyPort
     private var _autoCheckUpdate = MutableStateFlow(false)
     val autoCheckUpdate: StateFlow<Boolean> = _autoCheckUpdate
-    private var _updateChannel: MutableStateFlow<String> = MutableStateFlow(DataStoreManager.GITHUB)
-    val updateChannel: StateFlow<String> = _updateChannel
     private var _blurFullscreenLyrics = MutableStateFlow(false)
     val blurFullscreenLyrics: StateFlow<Boolean> = _blurFullscreenLyrics
     private var _blurPlayerBackground = MutableStateFlow(false)
@@ -228,7 +226,6 @@ class SettingsViewModel(
         getCrossfadeDuration()
         getContributorNameAndEmail()
         getBackupDownloaded()
-        getUpdateChannel()
         getEnableLiquidGlass()
         getExplicitContentEnabled()
         viewModelScope.launch {
@@ -263,21 +260,6 @@ class SettingsViewModel(
         viewModelScope.launch {
             dataStoreManager.setEnableLiquidGlass(enableLiquidGlass)
             getEnableLiquidGlass()
-        }
-    }
-
-    private fun getUpdateChannel() {
-        viewModelScope.launch {
-            dataStoreManager.updateChannel.collect { channel ->
-                _updateChannel.value = channel
-            }
-        }
-    }
-
-    fun setUpdateChannel(channel: String) {
-        viewModelScope.launch {
-            dataStoreManager.setUpdateChannel(channel)
-            getUpdateChannel()
         }
     }
 

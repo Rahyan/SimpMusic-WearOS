@@ -104,6 +104,8 @@ Signed outputs go to `build/release/`, or `OUTPUT_DIR`. Choose an empty director
 
 Packaging checks matching package/version/certificate, non-debuggable manifests, native payloads and final 16 KB alignment. Its manifest also records the source commit and whether the checkout has uncommitted changes. It rejects Android debug keys and test package names for public packaging. Keep the production signing key and its password backed up securely between releases; a newly generated key cannot update an existing install with its data intact. Do not publish outputs produced with the local-only `--allow-test-key` option.
 
+The public package and signing certificate fingerprint are recorded in [release-signing.json](../release-signing.json). Packaging and independent release verification reject a different signer. That file contains public verification data only; keep the private keystore and its password outside Git.
+
 After an unsigned Gradle build, the same packaging step works on Windows using `python package_wear_release.py`:
 
 ```sh

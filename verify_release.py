@@ -10,6 +10,13 @@ import sys
 import zipfile
 
 
+def public_identity():
+    identity = json.loads(Path(__file__).with_name('release-signing.json').read_text(encoding='utf-8'))
+    if identity.get('package') != 'io.github.rahyan.simpmusicwear' or not re.fullmatch(r'[0-9a-f]{64}', identity.get('certificate_sha256', '')):
+        raise ValueError('Invalid public signing identity')
+    return identity
+
+
 def verify_contents(directory, version, source_revision, package='io.github.rahyan.simpmusicwear', allow_test_key=False):
     directory = Path(directory)
     manifest = json.loads((directory/'release-manifest.json').read_text(encoding='utf-8'))
@@ -25,6 +32,8 @@ def verify_contents(directory, version, source_revision, package='io.github.rahy
         raise ValueError('Release source revision does not match')
     if not re.fullmatch(r'[0-9a-f]{64}', manifest.get('certificate_sha256', '')):
         raise ValueError('Invalid signing certificate hash')
+    if not allow_test_key and manifest['certificate_sha256'] != public_identity()['certificate_sha256']:
+        raise ValueError('Signing certificate does not match the retained release key')
     names = {f'SimpMusic-WearOS-{version}-{abi}.apk' for abi in ['armeabi-v7a', 'arm64-v8a', 'arm-universal']}
     names.add(f'SimpMusic-Companion-{version}.apk')
     artifacts = manifest.get('artifacts', {})

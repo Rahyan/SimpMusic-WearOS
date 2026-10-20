@@ -5,6 +5,5 @@ import com.maxrave.domain.utils.Resource
 import kotlinx.coroutines.flow.Flow
 
 interface UpdateRepository {
-    fun checkForGithubReleaseUpdate(): Flow<Resource<UpdateData>>
-    fun checkForFdroidUpdate(): Flow<Resource<UpdateData>>
+    fun checkForGithubReleaseUpdate(currentVersion: String, flavor: String, supportedAbis: List<String>): Flow<Resource<UpdateData?>>
 }

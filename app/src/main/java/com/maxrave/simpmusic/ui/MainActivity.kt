@@ -624,7 +624,7 @@ class MainActivity : AppCompatActivity() {
                                             val browserIntent =
                                                 Intent(
                                                     Intent.ACTION_VIEW,
-                                                    "https://simpmusic.org/download".toUri(),
+                                                    response.releaseUrl.toUri(),
                                                 )
                                             startActivity(browserIntent)
                                         },

@@ -21,9 +21,10 @@ class ReleaseAssetsTest(unittest.TestCase):
             payload = ('fixture-'+name).encode()
             (self.root/name).write_bytes(payload)
             artifacts[name] = {'bytes': len(payload), 'sha256': hashlib.sha256(payload).hexdigest()}
+        identity = json.loads((Path(__file__).resolve().parent.parent/'release-signing.json').read_text(encoding='utf-8'))
         self.manifest = {'package': 'io.github.rahyan.simpmusicwear', 'version_name': self.version,
             'version_code': 41, 'test_only': False, 'source_dirty': False,
-            'source_revision': self.revision, 'certificate_sha256': 'b'*64, 'artifacts': artifacts}
+            'source_revision': self.revision, 'certificate_sha256': identity['certificate_sha256'], 'artifacts': artifacts}
         self.save()
         (self.root/'SHA256SUMS').write_text(''.join(f"{v['sha256']}  {k}\n" for k, v in artifacts.items()), encoding='utf-8')
 
@@ -35,6 +36,12 @@ class ReleaseAssetsTest(unittest.TestCase):
 
     def test_complete_matching_release(self):
         self.assertEqual(self.verify()['source_revision'], self.revision)
+
+    def test_reject_other_release_signing_key(self):
+        self.manifest['certificate_sha256'] = 'b'*64
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'certificate does not match'):
+            self.verify()
 
     def test_reject_upstream_and_development_packages(self):
         for package in ['com.maxrave.simpmusic', 'io.github.rahyan.simpmusicwear.dev',

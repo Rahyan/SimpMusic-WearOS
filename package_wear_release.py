@@ -11,6 +11,8 @@ import sys
 import tempfile
 import zipfile
 
+from verify_release import public_identity
+
 
 def run(*command):
     return subprocess.check_output([str(part) for part in command], text=True, stderr=subprocess.STDOUT)
@@ -58,6 +60,9 @@ def main():
         raise ValueError('Watch and companion package/version must match')
     if not args.allow_test_key and re.search(r'\.(test|dev|debug)(\.|$)', wear_identity['name']):
         raise ValueError('Test package cannot be packaged as a public release')
+    expected_identity = None if args.allow_test_key else public_identity()
+    if expected_identity and wear_identity['name'] != expected_identity['package']:
+        raise ValueError('APK package does not match the public signing identity')
     version = wear_identity['versionName']
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*', version):
         raise ValueError('Version cannot be used safely as a filename')
@@ -84,6 +89,8 @@ def main():
             digest = re.search(r'^Signer #1 certificate SHA-256 digest: (\w+)$', certificate, re.M)
             if digest is None:
                 raise ValueError('Could not verify signing certificate')
+            if expected_identity and digest.group(1) != expected_identity['certificate_sha256']:
+                raise ValueError('Signing certificate does not match the retained release key')
             certificates.add(digest.group(1))
             run(align, '-c', '-P', '16', '4', signed)
             if identity(signed) != wear_identity:

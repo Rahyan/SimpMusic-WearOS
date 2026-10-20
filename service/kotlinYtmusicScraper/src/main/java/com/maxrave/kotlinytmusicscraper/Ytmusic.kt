@@ -593,13 +593,9 @@ class Ytmusic(
         }
 
     suspend fun checkForGithubReleaseUpdate() =
-        httpClient.get("https://api.github.com/repos/maxrave-dev/SimpMusic/releases/latest") {
+        httpClient.get(com.maxrave.common.ForkReleases.API_URL) {
             contentType(ContentType.Application.Json)
-        }
-
-    suspend fun checkForFdroidUpdate() =
-        httpClient.get("https://f-droid.org/api/v1/packages/com.maxrave.simpmusic") {
-            contentType(ContentType.Application.Json)
+            parameter("per_page", 30)
         }
 
     suspend fun playlist(playlistId: String) =

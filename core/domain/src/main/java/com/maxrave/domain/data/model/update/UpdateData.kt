@@ -4,4 +4,5 @@ data class UpdateData(
     val tagName: String,
     val releaseTime: String?,
     val body: String,
+    val releaseUrl: String,
 )
