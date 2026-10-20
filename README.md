@@ -1,6 +1,6 @@
 # SimpMusic-WearOS
 
-SimpMusic for Wear OS. Search YouTube Music, play directly on your watch, and download music to take with you.
+SimpMusic for Wear OS. Browse and search YouTube Music, play directly on your watch, and download music to take with you.
 
 The watch has its own player, queue, library and downloads. The Android companion handles signing in and gives you a bigger screen for controlling the watch. You can also build the full SimpMusic phone app if you want music playback on your phone too.
 
@@ -90,13 +90,13 @@ The full phone app is optional: build it with `:app:assembleFossDebug`. More bui
 
 ## Compatibility
 
-The companion requires Android 8.0 or newer. Watch builds are available for ARMv7 and ARM64. Hardware testing has focused on the Galaxy Watch4 Classic; reports from other watches are welcome.
+The companion requires Android 8.0 or newer. Watch builds are available for ARMv7 and ARM64. I've been testing this on my Galaxy Watch4 Classic, with a Galaxy S23 for the companion. If you're using another watch, let me know how it goes.
 
 Playback and sign-in depend on YouTube's services and can break when YouTube changes them.
 
 ## About this fork
 
-This fork adds a Wear OS app and Android companion to SimpMusic. It uses the Android codebase, with selected fixes adapted from upstream's multiplatform project. [Upstream notes](docs/upstream-compatibility.md) track those changes and the differences between the projects.
+I'm building this fork to bring SimpMusic to Wear OS, with an Android companion for signing in and controlling the watch. It uses the Android codebase, with selected fixes adapted from upstream's multiplatform project. [Upstream notes](docs/upstream-compatibility.md) track those changes and the differences between the projects.
 
 ## Credits
 

@@ -118,14 +118,16 @@ python3 package_wear_release.py \
 
 Set `KEYSTORE_PASSWORD` and `KEY_PASSWORD` in the process environment first. In PowerShell, replace the Unix continuations and environment-variable syntax with their PowerShell equivalents, or place the command on one line. Validate downloads with `sha256sum -c SHA256SUMS` on Linux or `Get-FileHash <apk> -Algorithm SHA256` on Windows. Compare the APK's hash to its entry in `SHA256SUMS`.
 
-The unsigned GitHub workflow builds and checks the apps. The release workflow signs watch/companion artifacts on version tags or manual dispatch; it needs the signing secrets configured by the maintainer. Optional full phone APKs can be enabled with the `full_phone` dispatch input.
+The unsigned GitHub workflow builds and checks the apps, and retains the release mappings. Production signing can stay on your own machine: download the unsigned artifacts from the successful workflow run for the release commit, then package and verify them with the local helper.
+
+Hosted signing is optional. Configure the signing secrets and set the repository variable `ENABLE_HOSTED_RELEASE_SIGNING` to `true` to sign automatically on version tags. A manual dispatch also requests signing. Optional full phone APKs can be enabled with the `full_phone` dispatch input.
 
 ## Preparing a GitHub release
 
 App versions are set in `gradle/libs.versions.toml`. Release notes belong under `docs/releases/`; see [0.3.0-beta.1](releases/0.3.0-beta.1.md) for the install pair and upgrade guidance.
 
 1. Complete the [maintainer release checklist](release-checklist.md) against the final minified build, and run the GitHub build workflow on the source being released.
-2. Configure `BASE_64_SIGNING_KEY`, `KEY_STORE_PASSWORD`, `ALIAS` and optional `KEY_PASSWORD` repository secrets. Use a retained production key; do not substitute a local debug key. Keep an independent, secure backup.
+2. For hosted signing, configure `BASE_64_SIGNING_KEY`, `KEY_STORE_PASSWORD`, `ALIAS` and optional `KEY_PASSWORD` repository secrets, then enable `ENABLE_HOSTED_RELEASE_SIGNING`. Local signing does not require uploading the key to GitHub. Use a retained production key and keep an independent, secure backup.
 3. Build signed artifacts with the workflow or helper. Confirm the tag/version/code, package and certificate in `release-manifest.json`. Keep all APKs from one build together.
 4. A version-tag run creates an unpublished GitHub prerelease draft with the four APKs, `SHA256SUMS`, manifest and release notes. On manual dispatch, enable `create_draft` and run against the commit referenced by the existing version tag. The workflow independently checks all assets, signatures, source identity and native payloads before creating the draft. It refuses test-only or dirty-source builds and never overwrites an existing release or draft.
 5. Review the draft and publish it when the release checklist is complete. The workflow never publishes automatically.

@@ -27,6 +27,7 @@ concurrency:
 jobs:
   build-wear-companion-release:
     name: Build matching watch and companion release
+    if: github.event_name == 'workflow_dispatch' || vars.ENABLE_HOSTED_RELEASE_SIGNING == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
