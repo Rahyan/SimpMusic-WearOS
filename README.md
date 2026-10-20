@@ -27,15 +27,28 @@ This fork uses its own package name, `io.github.rahyan.simpmusicwear`, and can b
 
 ## Screenshots
 
-| Watch player | Player controls |
-| --- | --- |
-| <img src="asset/readme/current/watch-player.png" alt="Watch playing Instant Crush" width="240"> | <img src="asset/readme/current/watch-controls.png" alt="Watch player drawer controls" width="240"> |
+| Player | Controls | Queue |
+| --- | --- | --- |
+| <img src="asset/readme/current/watch-player.png" alt="The Format by AZ playing on the watch" width="240"> | <img src="asset/readme/current/watch-controls.png" alt="Watch player controls" width="240"> | <img src="asset/readme/current/watch-queue.png" alt="The watch queue with The Format selected" width="240"> |
 
-| Companion player | Playback and offline controls |
+| Discover | Offline music |
 | --- | --- |
-| <img src="asset/readme/current/companion-player.png" alt="Companion player" width="260"> | <img src="asset/readme/current/companion-offline.png" alt="Companion offline queue panel" width="260"> |
+| <img src="asset/readme/current/watch-discover.png" alt="Discover on the watch" width="240"> | <img src="asset/readme/current/watch-downloads.png" alt="A ready offline queue on the watch" width="240"> |
 
-Captured on a Galaxy Watch4 Classic and Galaxy S23. Watch screenshots captured with [WearCapture](https://github.com/Rahyan/WearCapture). [Capture details](asset/readme/current/README.md).
+| Companion player | Offline queue |
+| --- | --- |
+| <img src="asset/readme/current/companion-player.png" alt="The companion following The Format by AZ" width="260"> | <img src="asset/readme/current/companion-offline.png" alt="The companion showing a completed offline queue" width="260"> |
+
+<details>
+<summary>Song details and more of the watch queue</summary>
+
+| Song details | Queue |
+| --- | --- |
+| <img src="asset/readme/current/watch-details-scroll.png" alt="A scrolling view of song details for The Format by AZ" width="280"> | <img src="asset/readme/current/watch-queue-scroll.png" alt="A scrolling view of the watch queue" width="280"> |
+
+</details>
+
+Captured on a Galaxy Watch4 Classic and Galaxy S23. The two scrolling watch views use [WearCapture](https://github.com/Rahyan/WearCapture). [Capture details](asset/readme/current/README.md).
 
 ## Install and sign in
 

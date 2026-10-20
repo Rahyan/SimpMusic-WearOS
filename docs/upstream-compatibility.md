@@ -2,6 +2,8 @@
 
 Reviewed October 18, 2026.
 
+Application refs rechecked October 20: main and dev still match the revisions below.
+
 This fork keeps SimpMusic's Android codebase for the Wear app, the small companion and the optional full phone app. Upstream now uses a multiplatform app and a separate core repository. Keeping up means reviewing both repositories and adapting changes to the Android interfaces used here.
 
 The fork is not fully merged with upstream. The table below records what was compared, and the next section records what was actually brought over.

@@ -2,7 +2,7 @@
 
 Run these checks against the source revision and APKs being released. Record the device model, Android version, ABI and artifact hash with device results.
 
-Status for `0.3.0-beta.1` (version code 41), updated October 19, 2026.
+Status for `0.3.0-beta.1` (version code 41), updated October 20, 2026.
 
 ## Build and tests
 
@@ -40,17 +40,21 @@ There are no lint errors or fatal issues. Emulator input checks supplement the p
 
 Use minified APKs signed with the same key on the watch and phone.
 
-Completed checks used minified builds on a Galaxy Watch4 Classic (API 34, ARMv7) paired with a Galaxy S23 (API 34). Earlier checks used an isolated package; the public package pair has also been installed, signed in and connected successfully. It streamed music and handled a companion Pause command. The extended public-package playback and offline checks remain open below.
+Completed checks used minified builds on a Galaxy Watch4 Classic (API 34, ARMv7) paired with a Galaxy S23 (API 34). Earlier checks used an isolated package. The signed public pair has also passed sign-in, synchronization, a three-minute streaming run through track completion, consecutive one-second player updates and companion controls. A ready offline queue and its files survived an in-place signed candidate reinstall. Fresh multi-track playback with both radios disabled remains unverified: the latest attempt stopped before playback because Wi-Fi stayed enabled.
 
 - [x] Search and stream as a guest, seek forward and continue to the next queued track without a playback error.
-- [ ] Repeat sustained streaming, buffering and retry checks with a signed-in account.
+- [x] Sustain signed-in streaming for three minutes and continue into the next track without a playback error.
+- [ ] Exercise buffering and failed-stream retry with a signed-in account.
 - [x] Restart a finished finite queue with the normal watch and companion Play buttons.
 - [x] Check consecutive one-second updates on the watch and companion, including the companion slider.
 - [x] Check held drawer drags in both directions, settling, Back and tab changes on the watch.
 - [ ] Scroll long synced lyrics and long queues without accidental drawer dismissal.
+- [x] Scroll the public build's 51-track queue without dismissing the drawer or changing its order; captured excerpts cover the first entries, not the whole list.
 - [x] Confirm real bezel volume changes by one hardware step per click.
+- [x] Confirm the volume overlay appears when turning the physical bezel.
 - [ ] Check temporary volume feedback restoration and rotary list scrolling on hardware.
 - [x] Check the player and drawer with larger system text, including lyric display controls.
+- [x] Open another song from a retained search screen after scrolling song details; each new selection starts at the top.
 - [ ] Check a smaller physical round display; emulator coverage supplements this check.
 - [x] Reopen a stopped downloaded queue and play after a late seek with Wi-Fi and Bluetooth disabled.
 - [ ] Select a fresh offline queue and change between multiple downloaded tracks with both radios disabled.
@@ -68,9 +72,10 @@ Completed checks used minified builds on a Galaxy Watch4 Classic (API 34, ARMv7)
 - [ ] Check restricted/unavailable media and useful error/retry behavior.
 - [ ] Measure watch cold start, player frame behavior and memory use. The companion's three measured cold activity launches were 154–158 ms; that does not measure watch performance.
 - [x] Update the isolated test apps in place and retain their session and verified offline download.
+- [x] Update the signed public candidates in place, retain session/settings, and verify the ready offline queue and completed download files survive reinstall.
 - [ ] Install over the previous publicly supported version with its retained signing key and verify settings, library and downloads.
 
-The new fork package is a separate install from older packages. Their data is not transferred automatically. The signed public candidates install alongside the original apps; an in-place public-package update with persisted downloads still needs verification.
+The new fork package is a separate install from older packages. Their data is not transferred automatically. Candidate-to-candidate update checks used the retained signing key and version code 41; they do not replace testing upgrades from a published predecessor when one exists.
 
 ## Publication
 

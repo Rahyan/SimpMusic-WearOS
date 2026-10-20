@@ -1,14 +1,21 @@
 # App screenshots
 
-Captured October 19, 2026 from `0.3.0-beta.1` release builds on a Galaxy Watch4 Classic and Galaxy S23, both running Android 14.
+Captured October 20, 2026 from `0.3.0-beta.1` release builds on a Galaxy Watch4 Classic and Galaxy S23, both running Android 14.
 
-- `watch-player.png`: music playing on the watch.
-- `watch-controls.png`: the player drawer's playback controls.
-- `companion-player.png`: the companion following the watch's active player.
-- `companion-offline.png`: playback controls and offline queue preparation.
+The player shows **The Format by AZ**. These are real app screens from the matching, signed watch and companion builds.
 
-These show a real playback session. The offline panel offers to download the current queue; it does not show a completed download.
+| File | View | Capture |
+| --- | --- | --- |
+| `watch-player.png` | Watch player | Standard screenshot, 450 × 450 |
+| `watch-controls.png` | Player controls | Standard screenshot, 450 × 450 |
+| `watch-queue.png` | Current queue entry | Standard screenshot, 450 × 450 |
+| `watch-discover.png` | Discover | Standard screenshot, 450 × 450 |
+| `watch-downloads.png` | Ready offline queue | Standard screenshot, 450 × 450 |
+| `companion-player.png` | Phone player | Standard screenshot, 1080 × 2340 |
+| `companion-offline.png` | Completed offline queue | Standard screenshot, 1080 × 2340 |
+| `watch-details-scroll.png` | Song details excerpt | Scrolling watch capture, 450 × 821 |
+| `watch-queue-scroll.png` | Queue excerpt | Scrolling watch capture, 450 × 815 |
 
-Captured using [WearCapture](https://github.com/Rahyan/WearCapture). Watch images use its circular display mask; phone images retain the full screenshot. The tool's scrolling capture was also used to inspect the watch's Downloads page.
+Standard screenshots were taken with Android's ADB screenshot command. The two scrolling watch images were stitched with [WearCapture](https://github.com/Rahyan/WearCapture). They show short sections of the pages. Phone images are normal screenshots.
 
-When refreshing the gallery, use matching builds on the watch and phone, capture the current UI, and review the images for account details before adding them here.
+The offline panel shows a queue whose files have finished downloading on the watch.
