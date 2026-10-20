@@ -6,7 +6,9 @@ plugins {
 }
 
 val wearChannelApplicationId =
-    providers.gradleProperty("simpmusic.wear.applicationId").orElse("com.maxrave.simpmusic").get()
+    providers.gradleProperty("simpmusic.wear.applicationId")
+        .orElse(providers.gradleProperty("simpmusic.applicationId"))
+        .get()
 
 kotlin {
     jvmToolchain(21)

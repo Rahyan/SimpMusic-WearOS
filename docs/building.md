@@ -47,18 +47,19 @@ Its split and universal APKs appear under `app/build/outputs/apk/foss/debug/`. I
 
 ## Separate test installs
 
-Default release packages use `com.maxrave.simpmusic`; debug adds `.dev`. The watch and phone must share both the final package name and signing certificate for Wear Data Layer messages.
+Release packages use `io.github.rahyan.simpmusicwear`; debug adds `.dev`. This fork can be installed alongside upstream SimpMusic. The watch and phone must share both the final package name and signing certificate for Wear Data Layer messages.
 
 To keep a debug test install separate from an existing `.dev` app:
 
 ```sh
 ./gradlew --no-daemon \
-  -Psimpmusic.wear.applicationId=com.maxrave.simpmusic.test \
-  -Psimpmusic.companion.applicationId=com.maxrave.simpmusic.test \
+  -Psimpmusic.applicationId=io.github.rahyan.simpmusicwear.test \
   :wearApp:assembleDebug :companionApp:assembleDebug
 ```
 
-Both outputs then install as `com.maxrave.simpmusic.test.dev`. These overrides apply to the watch and lightweight companion, not the full phone app. A release build has no `.dev` suffix; set both overrides to the complete package name you want.
+Both outputs then install as `io.github.rahyan.simpmusicwear.test.dev`. The shared `simpmusic.applicationId` property also applies to the optional full phone app. A release build has no `.dev` suffix; use the complete package name you want. The older module-specific `simpmusic.wear.applicationId` and `simpmusic.companion.applicationId` overrides remain supported and take precedence for their respective modules.
+
+Changing the package name creates a separate install. It does not carry over an older package's sign-in, library or downloads. Future updates must retain the public package name and signing key. Internal Kotlin namespaces remain separate from this install identity.
 
 For a smaller debug APK, select one ABI with `-Psimpmusic.wear.abis=armeabi-v7a` or `-Psimpmusic.wear.abis=arm64-v8a`. Check the device with `adb -s <watch-id> shell getprop ro.product.cpu.abilist` rather than guessing from its CPU. Emulator ABIs can also be selected.
 

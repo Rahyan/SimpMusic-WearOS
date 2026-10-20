@@ -10,7 +10,7 @@ import sys
 import zipfile
 
 
-def verify_contents(directory, version, source_revision, package='com.maxrave.simpmusic', allow_test_key=False):
+def verify_contents(directory, version, source_revision, package='io.github.rahyan.simpmusicwear', allow_test_key=False):
     directory = Path(directory)
     manifest = json.loads((directory/'release-manifest.json').read_text(encoding='utf-8'))
     if not re.fullmatch(r'[0-9A-Za-z][0-9A-Za-z._-]*', version):

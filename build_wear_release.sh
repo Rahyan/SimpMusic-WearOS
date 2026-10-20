@@ -27,7 +27,7 @@ done
 build_args=()
 if [[ -n "${APPLICATION_ID:-}" ]]; then
   [[ "$APPLICATION_ID" =~ ^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$ ]] || { echo "Invalid APPLICATION_ID" >&2; exit 1; }
-  build_args+=("-Psimpmusic.wear.applicationId=$APPLICATION_ID" "-Psimpmusic.companion.applicationId=$APPLICATION_ID")
+  build_args+=("-Psimpmusic.applicationId=$APPLICATION_ID")
 fi
 if [[ -n "${WEAR_ABIS:-}" ]]; then build_args+=("-Psimpmusic.wear.abis=$WEAR_ABIS"); fi
 bash ./gradlew --no-configuration-cache "${build_args[@]}" :wearApp:clean :companionApp:clean :wearApp:assembleRelease :companionApp:assembleRelease

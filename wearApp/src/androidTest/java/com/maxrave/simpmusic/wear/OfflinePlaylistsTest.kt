@@ -37,7 +37,7 @@ class OfflinePlaylistsTest {
 
     @Before fun prepare() {
         context = InstrumentationRegistry.getInstrumentation().targetContext
-        assumeTrue(context.packageName == "com.maxrave.simpmusic.test.dev")
+        assumeTrue(isIsolatedTestPackage(context.packageName))
         assumeTrue(InstrumentationRegistry.getArguments().getString("offlinePlaylists") == "true")
         val factory = object : WorkerFactory() {
             override fun createWorker(context: Context, workerClassName: String, parameters: WorkerParameters): ListenableWorker? =

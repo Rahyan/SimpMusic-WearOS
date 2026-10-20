@@ -21,7 +21,7 @@ class ReleaseAssetsTest(unittest.TestCase):
             payload = ('fixture-'+name).encode()
             (self.root/name).write_bytes(payload)
             artifacts[name] = {'bytes': len(payload), 'sha256': hashlib.sha256(payload).hexdigest()}
-        self.manifest = {'package': 'com.maxrave.simpmusic', 'version_name': self.version,
+        self.manifest = {'package': 'io.github.rahyan.simpmusicwear', 'version_name': self.version,
             'version_code': 41, 'test_only': False, 'source_dirty': False,
             'source_revision': self.revision, 'certificate_sha256': 'b'*64, 'artifacts': artifacts}
         self.save()
@@ -35,6 +35,15 @@ class ReleaseAssetsTest(unittest.TestCase):
 
     def test_complete_matching_release(self):
         self.assertEqual(self.verify()['source_revision'], self.revision)
+
+    def test_reject_upstream_and_development_packages(self):
+        for package in ['com.maxrave.simpmusic', 'io.github.rahyan.simpmusicwear.dev',
+                        'io.github.rahyan.simpmusicwear.test.dev']:
+            with self.subTest(package=package):
+                self.manifest['package'] = package
+                self.save()
+                with self.assertRaisesRegex(ValueError, 'package/version'):
+                    self.verify()
 
     def test_reject_test_only_and_dirty_source(self):
         for field in ['test_only', 'source_dirty']:

@@ -2,6 +2,25 @@
 import com.android.build.gradle.internal.tasks.CompileArtProfileTask
 import java.util.Properties
 
+abstract class GenerateLauncherShortcuts : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val templateFile: RegularFileProperty
+
+    @get:Input
+    abstract val applicationId: Property<String>
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val output = outputDirectory.file("xml/shortcuts.xml").get().asFile
+        output.parentFile.mkdirs()
+        output.writeText(templateFile.get().asFile.readText().replace("@APPLICATION_ID@", applicationId.get()))
+    }
+}
+
 val localBuildProperties = Properties().apply {
     rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
 }
@@ -30,7 +49,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.maxrave.simpmusic"
+        applicationId = providers.gradleProperty("simpmusic.applicationId").get()
         minSdk = 26
         targetSdk = 36
         versionCode =
@@ -156,6 +175,21 @@ android {
                 "META-INF/notice",
                 "META-INF/*.kotlin_module",
             )
+    }
+}
+
+// Shortcut intent packages must be literals. Generate them from each variant's final ID,
+// including .dev and custom test channels, while keeping the activity's source namespace.
+androidComponents {
+    onVariants { variant ->
+        val generateShortcuts = tasks.register<GenerateLauncherShortcuts>(
+            "generate${variant.name.replaceFirstChar { it.uppercaseChar() }}LauncherShortcuts",
+        ) {
+            templateFile.set(layout.projectDirectory.file("src/main/shortcuts.xml"))
+            applicationId.set(variant.applicationId)
+            outputDirectory.set(layout.buildDirectory.dir("generated/launcherShortcuts/${variant.name}/res"))
+        }
+        variant.sources.res?.addGeneratedSourceDirectory(generateShortcuts, GenerateLauncherShortcuts::outputDirectory)
     }
 }
 

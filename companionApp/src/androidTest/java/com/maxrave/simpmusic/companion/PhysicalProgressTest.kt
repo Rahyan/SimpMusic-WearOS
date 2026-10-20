@@ -28,7 +28,7 @@ class PhysicalProgressTest {
         automation.serviceInfo = automation.serviceInfo.apply {
             flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
         }
-        check(context.packageName == "com.maxrave.simpmusic.test.dev")
+        check(isIsolatedTestPackage(context.packageName))
         val node = getConnectedNodes(context).single().id
         var response = JSONObject()
         suspend fun request(action: String, payload: JSONObject = JSONObject()): JSONObject {

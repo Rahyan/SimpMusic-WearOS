@@ -25,7 +25,7 @@ class PhysicalInteractionTest {
         assumeTrue(preview || arguments.getString("physicalInteractions") == "true")
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        check(context.packageName == "com.maxrave.simpmusic.test.dev")
+        check(isIsolatedTestPackage(context.packageName))
         val automation = instrumentation.uiAutomation
         automation.serviceInfo = automation.serviceInfo.apply {
             flags = flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS

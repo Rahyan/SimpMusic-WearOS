@@ -20,7 +20,7 @@ class PhysicalQueueTest {
 
     @Test fun playNextRadioPolicyAndBatchTrimPreserveMirror(): Unit = runBlocking {
         assumeTrue(InstrumentationRegistry.getArguments().getString("physicalQueue") == "true")
-        check(InstrumentationRegistry.getInstrumentation().targetContext.packageName == "com.maxrave.simpmusic.test.dev")
+        check(isIsolatedTestPackage(InstrumentationRegistry.getInstrumentation().targetContext.packageName))
         val handler: MediaPlayerHandler = GlobalContext.get().get()
         val data: DataStoreManager = GlobalContext.get().get()
         val endless = data.endlessQueue.first() == DataStoreManager.TRUE

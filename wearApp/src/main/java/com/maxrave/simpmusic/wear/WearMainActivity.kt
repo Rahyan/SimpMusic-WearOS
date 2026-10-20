@@ -110,7 +110,7 @@ class WearMainActivity : ComponentActivity() {
         didDebugAutoplay = true
 
         // Useful for reproducing playback issues via ADB without UI interactions:
-        // adb shell am start -n com.maxrave.simpmusic.dev/com.maxrave.simpmusic.wear.WearMainActivity --es debug_video_id <id>
+        // adb shell am start -n io.github.rahyan.simpmusicwear.dev/com.maxrave.simpmusic.wear.WearMainActivity --es debug_video_id <id>
         lifecycleScope.launch {
             // Give DI/service binding a moment; loadMediaItem is still safe if the service is not
             // fully connected yet (we mainly want logs and extraction behavior).

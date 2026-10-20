@@ -22,7 +22,7 @@ class PhysicalPlaybackTest {
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private fun permitted() {
         assumeTrue(InstrumentationRegistry.getArguments().getString("physicalPlayback") == "true")
-        check(context.packageName == "com.maxrave.simpmusic.test.dev")
+        check(isIsolatedTestPackage(context.packageName))
     }
     private fun track(id: String, title: String, seconds: Int) = Track(
         album = null, artists = listOf(Artist(null, "Hardware check")), duration = null, durationSeconds = seconds,

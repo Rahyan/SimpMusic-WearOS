@@ -7,7 +7,7 @@ Status for `0.3.0-beta.1` (version code 41), updated October 19, 2026.
 ## Build and tests
 
 - [x] Validate the domain, common, scraper, watch, companion and full-phone Foss unit suites: 94 regression cases. The affected scraper and watch suites pass all 42 tests; the final sheet changes also pass the watch suite.
-- [x] Run the release-tool suite: 13 tests pass, including artifact integrity and draft-only creation.
+- [x] Run the release-tool suite: 14 tests pass, including artifact integrity, public package identity and draft-only creation.
 - [x] Compile both Foss and Full phone Kotlin variants.
 - [x] Build watch and companion debug APKs, instrumentation APKs and minified release APKs.
 - [x] Run watch and companion debug/release lint; review remaining warnings.
@@ -24,6 +24,7 @@ There are no lint errors or fatal issues. Emulator input checks supplement the p
 
 ## Packaging and signing
 
+- [x] Set the watch, companion and optional full phone app to `io.github.rahyan.simpmusicwear`, with `.dev` for debug builds.
 - [x] Verify ARMv7, ARM64 and universal watch packaging, plus the matching companion.
 - [x] Check watch native payloads: retain V8; exclude phone-only Python and FFmpeg libraries.
 - [x] Verify 64-bit ELF and final APK ZIP alignment for 16 KB pages.

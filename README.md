@@ -23,7 +23,7 @@ There are two choices:
 
 Choose one on your phone. They use the same application ID, so installing one replaces the other. The watch and phone apps need matching application IDs and signing certificates for the connection to work.
 
-An existing upstream SimpMusic install may have the same package name but a different signing key. Android will reject that replacement; [separate test builds](docs/building.md#separate-test-installs) let you try this fork without removing it.
+This fork uses its own package name, `io.github.rahyan.simpmusicwear`, and can be installed alongside upstream SimpMusic. Debug builds add `.dev` and keep their own app data.
 
 ## Screenshots
 

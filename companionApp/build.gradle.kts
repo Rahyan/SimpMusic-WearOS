@@ -7,7 +7,7 @@ plugins {
 val companionChannelApplicationId =
     providers
         .gradleProperty("simpmusic.companion.applicationId")
-        .orElse("com.maxrave.simpmusic")
+        .orElse(providers.gradleProperty("simpmusic.applicationId"))
         .get()
 
 kotlin {

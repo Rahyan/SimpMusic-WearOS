@@ -17,7 +17,7 @@ class PhysicalBridgeTest {
     @Test fun acknowledgementsSeekAndStaleCommands(): Unit = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         assumeTrue(InstrumentationRegistry.getArguments().getString("physicalBridge") == "true")
-        check(context.packageName == "com.maxrave.simpmusic.test.dev")
+        check(isIsolatedTestPackage(context.packageName))
         val node = getConnectedNodes(context).single().id
         suspend fun state(): JSONObject {
             val reply = requestWatch(context, node, Bridge.ACTION_PLAYBACK_STATE, timeoutMs = 30_000)

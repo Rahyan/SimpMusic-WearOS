@@ -21,7 +21,7 @@ import org.junit.runner.RunWith
 class PlaybackLifecycleTest {
     @Test(timeout = 90_000) fun coldSurfaceReadsStayLightAndServiceReconnectsAfterIdle() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        assumeTrue(context.packageName == "com.maxrave.simpmusic.test.dev")
+        assumeTrue(isIsolatedTestPackage(context.packageName))
         assumeTrue(InstrumentationRegistry.getArguments().getString("lifecyclePreview") == "true")
         val app = context.applicationContext as WearSimpMusicApplication
         assertNull("Fresh surface reads must not initialize playback", app.playbackHandler)

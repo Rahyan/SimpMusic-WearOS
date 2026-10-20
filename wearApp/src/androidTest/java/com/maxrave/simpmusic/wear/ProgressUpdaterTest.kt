@@ -16,7 +16,7 @@ import org.koin.core.context.GlobalContext
 class ProgressUpdaterTest {
     @Test fun startsAndRestartsOnFreshHandler(): Unit = runBlocking {
         assumeTrue(InstrumentationRegistry.getArguments().getString("progressUpdater") == "true")
-        check(InstrumentationRegistry.getInstrumentation().targetContext.packageName == "com.maxrave.simpmusic.test.dev")
+        check(isIsolatedTestPackage(InstrumentationRegistry.getInstrumentation().targetContext.packageName))
         val handler = withContext(Dispatchers.Main) { GlobalContext.get().get<MediaPlayerHandler>() }
         assumeTrue(withContext(Dispatchers.Main) { !handler.player.isPlaying })
         try {
