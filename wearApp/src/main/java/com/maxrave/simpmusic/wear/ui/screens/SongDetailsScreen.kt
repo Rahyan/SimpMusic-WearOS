@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MusicNote
@@ -62,6 +63,8 @@ fun SongDetailsScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    // Details open at the top for each selection; playback updates keep the current position.
+    val listState = remember(track.videoId) { LazyListState() }
     val downloadHandler: DownloadHandler = remember { GlobalContext.get().get() }
     val controlState = mediaPlayerHandler.controlState.collectAsStateWithLifecycle().value
     val nowPlayingState = mediaPlayerHandler.nowPlayingState.collectAsStateWithLifecycle().value
@@ -148,7 +151,7 @@ fun SongDetailsScreen(
             contentColor = MaterialTheme.colorScheme.onPrimary,
         )
 
-    WearList {
+    WearList(state = listState) {
         item { WearScreenHeader("Song details", onBack = onBack) }
 
         item { Spacer(Modifier.height(4.dp)) }
