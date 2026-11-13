@@ -1,6 +1,7 @@
 package com.maxrave.simpmusic.companion.bridge
 
 import android.content.Context
+import android.os.SystemClock
 import com.maxrave.common.WearCompanionBridge
 import java.time.LocalTime
 import java.time.temporal.ChronoUnit
@@ -13,6 +14,7 @@ object CompanionStore {
     private const val KEY_LOG = "companion_log"
     private const val MAX_LOG_CHARS = 16000
     private const val SESSION_MAX_AGE_MS = 14L * 24L * 60L * 60L * 1000L
+    private val playbackSnapshots = PlaybackSnapshotCache()
 
     data class SessionState(
         val hasCookie: Boolean,
@@ -75,20 +77,21 @@ object CompanionStore {
         )
     }
 
+    @Synchronized
     fun savePlayback(context: Context, node: String, data: org.json.JSONObject) {
         val snapshot = com.maxrave.common.decodeWatchPlayback(data) ?: return
+        if (!playbackSnapshots.receive(node, snapshot, SystemClock.elapsedRealtime())) return
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val key = com.maxrave.common.nodeSyncKey("playback", node)
-        val previous = prefs.getString(key, null)?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
-            ?.let { com.maxrave.common.decodeWatchPlayback(it) }
-        if (previous == null || snapshot.generatedAt >= previous.generatedAt) prefs.edit().putString(key, data.toString()).apply()
+        prefs.edit().putString(key, data.toString()).apply()
     }
 
-    fun getPlayback(context: Context, node: String): com.maxrave.common.WatchPlaybackSnapshot? =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    internal fun getPlayback(context: Context, node: String): ReceivedWatchPlayback? =
+        playbackSnapshots.get(node) ?: context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(com.maxrave.common.nodeSyncKey("playback", node), null)
             ?.let { runCatching { org.json.JSONObject(it) }.getOrNull() }
             ?.let { com.maxrave.common.decodeWatchPlayback(it) }
+            ?.let { ReceivedWatchPlayback(it) }
 
     fun saveLastResponse(
         context: Context,

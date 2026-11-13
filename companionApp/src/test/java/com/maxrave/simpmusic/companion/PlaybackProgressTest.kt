@@ -11,24 +11,46 @@ class PlaybackProgressTest {
     private fun snapshot(generatedAt: Long) = decodeWatchPlayback(JSONObject().put("playback",
         JSONObject().put("generatedAt", generatedAt)))!!
 
+    @Test fun eachPollStaysFreshWhenWatchClockIsSlightlyAhead() {
+        repeat(5) { poll ->
+            val phoneWallTime = 100_000L + poll * 3_000
+            val receivedAt = 1_000L + poll * 3_000
+            val state = snapshot(phoneWallTime + 75)
+            val receipt = PlaybackReceipt(receivedAt)
+            assertTrue("A fresh response must not disable controls at poll $poll",
+                playerSnapshotIsFresh(state, receivedAt, receipt))
+        }
+    }
+
+    @Test fun freshResponseDoesNotDependOnWatchAndPhoneWallClocksMatching() {
+        val receivedAt = 1_000L
+        for (offset in listOf(-60_000L, 60_000L)) {
+            val state = snapshot(100_000L + offset)
+            assertTrue("Live response with watch clock offset $offset",
+                playerSnapshotIsFresh(state, receivedAt, PlaybackReceipt(receivedAt)))
+        }
+    }
+
     @Test fun newSnapshotMustNotWaitForTheNextUiClockTick() {
         val state = snapshot(10_950)
         assertFalse(state.isFresh(10_000)) // The cached tick predates a legitimate new packet.
-        val receipt = PlaybackReceipt(wallTimeMs = 11_000, elapsedTimeMs = 1_000)
+        val receipt = PlaybackReceipt(elapsedTimeMs = 1_000)
         assertTrue(playerSnapshotIsFresh(state, tickAt = 0, receipt))
-        assertFalse(playerSnapshotIsFresh(state, tickAt = 15_951, receipt))
+        assertTrue(playerSnapshotIsFresh(state, tickAt = 16_000, receipt))
+        assertFalse(playerSnapshotIsFresh(state, tickAt = 16_001, receipt))
     }
 
-    @Test fun receiptDoesNotReviveExpiredOrFutureSnapshots() {
-        assertFalse(playerSnapshotIsFresh(snapshot(1_000), 1_000, PlaybackReceipt(30_000, 1_000)))
-        assertFalse(playerSnapshotIsFresh(snapshot(50_000), 1_000, PlaybackReceipt(40_000, 1_000)))
-        assertFalse(playerSnapshotIsFresh(null, 1_000, PlaybackReceipt(40_000, 1_000)))
+    @Test fun savedSnapshotWithoutALiveReceiptCannotEnableControls() {
+        assertFalse(playerSnapshotIsFresh(snapshot(1_000), 1_000, null))
+        assertFalse(playerSnapshotIsFresh(null, 1_000, PlaybackReceipt(1_000)))
     }
 
-    @Test fun wallClockChangesDoNotStopFreshnessFromExpiring() {
-        val receipt = PlaybackReceipt(wallTimeMs = 1_000_050, elapsedTimeMs = 2_000)
-        assertTrue(playerSnapshotIsFresh(snapshot(1_000_000), 16_950, receipt))
-        assertFalse(playerSnapshotIsFresh(snapshot(1_000_000), 16_951, receipt))
+    @Test fun watchWallClockCannotStopFreshnessFromExpiring() {
+        val receipt = PlaybackReceipt(elapsedTimeMs = 2_000)
+        for (generatedAt in listOf(1L, Long.MAX_VALUE)) {
+            assertTrue(playerSnapshotIsFresh(snapshot(generatedAt), 17_000, receipt))
+            assertFalse(playerSnapshotIsFresh(snapshot(generatedAt), 17_001, receipt))
+        }
     }
     @Test fun advancesEachSecondBetweenPackets() {
         for (elapsed in 0L..6L) assertEquals(97_000 + elapsed * 1_000,

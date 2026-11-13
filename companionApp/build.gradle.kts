@@ -23,8 +23,11 @@ android {
         minSdk = 26
         targetSdk = 36
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = libs.versions.version.code.get().toInt()
-        versionName = libs.versions.version.name.get()
+        // Companion test updates can advance independently of the installed watch app.
+        versionCode = providers.gradleProperty("simpmusic.companion.versionCode")
+            .orElse(libs.versions.version.code).get().toInt()
+        versionName = providers.gradleProperty("simpmusic.companion.versionName")
+            .orElse(libs.versions.version.name).get()
         vectorDrawables.useSupportLibrary = true
         buildConfigField("String", "COMPANION_CHANNEL_APPLICATION_ID", "\"$companionChannelApplicationId\"")
     }

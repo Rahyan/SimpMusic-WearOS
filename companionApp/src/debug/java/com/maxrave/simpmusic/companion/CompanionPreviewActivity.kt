@@ -11,6 +11,7 @@ import android.graphics.Canvas
 import java.io.File
 import com.maxrave.common.WatchPlaybackSnapshot
 import com.maxrave.common.WatchQueueTrack
+import com.maxrave.simpmusic.companion.bridge.ReceivedWatchPlayback
 
 /** Local design fixture. Excluded from release APKs; never connects to a real watch. */
 class CompanionPreviewActivity : ComponentActivity() {
@@ -36,8 +37,11 @@ class CompanionPreviewActivity : ComponentActivity() {
         )
         setContent { CompanionTheme { Surface {
             CompanionDashboard(watches = listOf("Galaxy Watch4 Classic"), selectedWatch = 0, onSelectWatch = {},
-                playback = if (intent.getBooleanExtra("empty", false)) sample.copy(videoId = "", queue = emptyList(), queueSize = 0,
-                    isPlaying = false, positionMs = 0, durationMs = 0, canNext = false, canPrevious = false, currentIndex = -1) else sample,
+                playback = ReceivedWatchPlayback(
+                    if (intent.getBooleanExtra("empty", false)) sample.copy(videoId = "", queue = emptyList(), queueSize = 0,
+                        isPlaying = false, positionMs = 0, durationMs = 0, canNext = false, canPrevious = false, currentIndex = -1) else sample,
+                    PlaybackReceipt(android.os.SystemClock.elapsedRealtime()),
+                ),
                 busy = false, feedback = "Local design preview · controls do not affect devices",
                 onPlaybackAction = {}, hasSession = true, needsLogin = false, loginReason = "", diagnostics = "", response = "", logs = "",
                 onRefresh = {}, onLogin = {}, onSync = {}, onClearSession = {}, onRemote = {}, onDiagnostics = {}, onCopy = { _, _ -> },

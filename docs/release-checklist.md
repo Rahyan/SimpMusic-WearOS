@@ -2,6 +2,16 @@
 
 Run these checks against the source revision and APKs being released. Record the device model, Android version, ABI and artifact hash with device results.
 
+## Beta.2 companion hotfix
+
+Version `0.3.0-beta.2` uses code 43. Existing users only need to update the companion; the beta.1 watch remains compatible. The complete APK set includes watch builds with the new version metadata and unchanged watch functionality. See the [beta.2 release notes](releases/0.3.0-beta.2.md).
+
+The focused regressions cover phone/watch clock differences, duplicate replies, cached state after process restart, per-watch state and expiry when responses stop. The reporter [confirmed the signed test fix](https://github.com/Rahyan/SimpMusic-WearOS/issues/1#issuecomment-6842952954) on a CMF Phone 2 Pro and Galaxy Watch6 running Android 16. That is a reporter-supplied result for the test APK; the final code43 APKs are rebuilt from the tagged source.
+
+Run hosted CI against the release source and verify all four final APKs, signatures, ABIs, checksums and tag before publication. The release manifest identifies the exact source commit and APK hashes. The detailed physical-device checks below record beta.1 coverage; they are not new hardware results for beta.2.
+
+## Beta.1 release record
+
 Status for `0.3.0-beta.1` (version code 41), updated October 20, 2026.
 
 [Published beta](https://github.com/Rahyan/SimpMusic-WearOS/releases/tag/v0.3.0-beta.1). The tag and signed APKs use source commit `87f75f1a7af5fba502c97035e2e50f0aba1020b3`, which passed [GitHub CI](https://github.com/Rahyan/SimpMusic-WearOS/actions/runs/39433896440). Remaining hardware checks below are deferred coverage for this beta.

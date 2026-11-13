@@ -26,12 +26,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.maxrave.common.WearCompanionBridge
+import com.maxrave.simpmusic.companion.bridge.ReceivedWatchPlayback
 import org.json.JSONObject
 
 @Composable
 internal fun CompanionDashboard(
     watches: List<String>, selectedWatch: Int, onSelectWatch: (Int) -> Unit,
-    playback: com.maxrave.common.WatchPlaybackSnapshot?, busy: Boolean, feedback: String,
+    playback: ReceivedWatchPlayback?, busy: Boolean, feedback: String,
     onPlaybackAction: (JSONObject) -> Unit, hasSession: Boolean, needsLogin: Boolean, loginReason: String,
     diagnostics: String, response: String, logs: String,
     onRefresh: () -> Unit, onLogin: () -> Unit, onSync: () -> Unit, onClearSession: () -> Unit,

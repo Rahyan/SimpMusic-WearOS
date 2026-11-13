@@ -28,7 +28,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.maxrave.common.WearCompanionBridge
-import com.maxrave.common.WatchPlaybackSnapshot
+import com.maxrave.simpmusic.companion.bridge.ReceivedWatchPlayback
 import com.maxrave.simpmusic.companion.bridge.ConnectedNode
 import com.maxrave.simpmusic.companion.bridge.requestWatch
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -60,7 +60,7 @@ class CompanionMainActivity : ComponentActivity() {
 
 private data class CompanionUiState(
     val connectedNodes: List<ConnectedNode> = emptyList(),
-    val playback: WatchPlaybackSnapshot? = null,
+    val playback: ReceivedWatchPlayback? = null,
     val hasCookie: Boolean = false,
     val isSessionExpired: Boolean = false,
     val requiresRelogin: Boolean = false,

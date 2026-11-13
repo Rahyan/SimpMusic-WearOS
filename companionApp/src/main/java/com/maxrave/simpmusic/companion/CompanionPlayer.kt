@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.maxrave.common.WatchPlaybackSnapshot
+import com.maxrave.simpmusic.companion.bridge.ReceivedWatchPlayback
 import com.maxrave.common.WearCompanionBridge as Bridge
 import org.json.JSONObject
 import kotlinx.coroutines.delay
@@ -33,7 +34,9 @@ import androidx.compose.animation.core.LinearEasing
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-internal fun CompanionPlayer(state: WatchPlaybackSnapshot?, connected: Boolean, busy: Boolean, onAction: (JSONObject) -> Unit) {
+internal fun CompanionPlayer(playback: ReceivedWatchPlayback?, connected: Boolean, busy: Boolean, onAction: (JSONObject) -> Unit) {
+    val state = playback?.snapshot
+    val receipt = playback?.receipt
     var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     val lifecycleOwner = LocalLifecycleOwner.current
     // A stalled poll may return the same state; freshness must still expire without another response.
@@ -42,7 +45,6 @@ internal fun CompanionPlayer(state: WatchPlaybackSnapshot?, connected: Boolean, 
             while (connected) { now = SystemClock.elapsedRealtime(); delay(1_000) }
         }
     }
-    val receipt = remember(state?.generatedAt) { PlaybackReceipt(System.currentTimeMillis(), SystemClock.elapsedRealtime()) }
     val fresh = connected && playerSnapshotIsFresh(state, now, receipt)
     val active = fresh && !busy && state?.videoId?.isNotBlank() == true
     var showQueue by remember { mutableStateOf(false) }
@@ -80,7 +82,7 @@ internal fun CompanionPlayer(state: WatchPlaybackSnapshot?, connected: Boolean, 
             Text(state?.artist?.ifBlank { "Start playback on your watch." } ?: "Connect your watch to see what’s playing.",
                 color = Muted, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        CompanionProgress(state, fresh, active, onAction)
+        CompanionProgress(state, receipt, fresh, active, onAction)
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Control(Icons.Rounded.SkipPrevious, "Previous track", { command(Bridge.REMOTE_PREVIOUS) }, Modifier.weight(1f), active && state?.canPrevious == true, height = 62)
             Control(if (state?.isPlaying == true) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
@@ -127,18 +129,17 @@ private fun clock(ms: Long): String = "${ms.coerceAtLeast(0) / 60_000}:${"%02d".
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun CompanionProgress(state: WatchPlaybackSnapshot?, fresh: Boolean, active: Boolean,
+private fun CompanionProgress(state: WatchPlaybackSnapshot?, receipt: PlaybackReceipt?, fresh: Boolean, active: Boolean,
     onAction: (JSONObject) -> Unit) {
     val owner = LocalLifecycleOwner.current
-    val anchor = remember(state?.videoId, state?.generatedAt) { SystemClock.elapsedRealtime() }
-    // Account for transport delay once, then use a monotonic clock even if wall time changes.
-    val ageAtReceipt = remember(anchor) { (System.currentTimeMillis() - (state?.generatedAt ?: System.currentTimeMillis())).coerceIn(0, 15_000) }
-    var elapsed by remember(anchor) { mutableLongStateOf(ageAtReceipt) }
+    var elapsed by remember(receipt, state?.videoId, state?.generatedAt) {
+        mutableLongStateOf(receipt?.ageAt(SystemClock.elapsedRealtime()) ?: 0L)
+    }
     var drag by remember(state?.videoId) { mutableStateOf<Float?>(null) }
-    LaunchedEffect(anchor, fresh, state?.isPlaying, state?.isBuffering, owner) {
-        if (!fresh || state?.isPlaying != true || state.isBuffering) return@LaunchedEffect
+    LaunchedEffect(receipt, fresh, state?.isPlaying, state?.isBuffering, owner) {
+        if (!fresh || receipt == null || state?.isPlaying != true || state.isBuffering) return@LaunchedEffect
         owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) { elapsed = ageAtReceipt + SystemClock.elapsedRealtime() - anchor; delay(250) }
+            while (true) { elapsed = receipt.ageAt(SystemClock.elapsedRealtime()); delay(250) }
         }
     }
     val duration = state?.durationMs?.coerceAtLeast(1) ?: 1

@@ -2,6 +2,8 @@
 
 SimpMusic for Wear OS. Browse and search YouTube Music, play directly on your watch, and download music to take with you.
 
+[Website](https://simpmusicwear.faceoff.watch/) · [Downloads](https://github.com/Rahyan/SimpMusic-WearOS/releases)
+
 The watch has its own player, queue, library and downloads. The Android companion handles signing in and gives you a bigger screen for controlling the watch. You can also build the full SimpMusic phone app if you want music playback on your phone too.
 
 ## On the watch
@@ -53,6 +55,8 @@ Captured on a Galaxy Watch4 Classic and Galaxy S23. The two scrolling watch view
 ## Install and sign in
 
 Download the watch and companion APKs from the [releases page](https://github.com/Rahyan/SimpMusic-WearOS/releases).
+
+**Updating from beta.1? You only need to update the companion on your phone to beta.2. Your beta.1 watch app can stay installed.** The companion update fixes the player repeatedly showing CONNECTING and briefly disabling its controls. It also installs over the beta.2 test build.
 
 Choose the watch APK for your watch's Android ABI and the companion APK from the same release. The ARM universal watch APK supports both ARMv7 and ARM64, with a larger download.
 
