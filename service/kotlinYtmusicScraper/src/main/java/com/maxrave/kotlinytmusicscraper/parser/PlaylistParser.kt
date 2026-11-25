@@ -7,7 +7,6 @@ import com.maxrave.kotlinytmusicscraper.models.WatchEndpoint
 import com.maxrave.kotlinytmusicscraper.models.getContinuation
 import com.maxrave.kotlinytmusicscraper.models.response.BrowseResponse
 import com.maxrave.kotlinytmusicscraper.models.response.LikeStatus
-import com.maxrave.logger.Logger
 
 fun BrowseResponse.fromPlaylistToTrack(): List<SongItem> =
     (
@@ -313,28 +312,8 @@ fun MusicShelfRenderer.Content.toSongItem(): SongItem? {
                 ?.text ?: return null,
         artists =
             flexColumns
-                .apply {
-                    Logger.w(
-                        "PlaylistParser",
-                        "Artists: ${this.map {
-                            it.musicResponsiveListItemFlexColumnRenderer.text
-                                ?.runs
-                                ?.firstOrNull()
-                                ?.text
-                        }}",
-                    )
-                }.filter {
+                .filter {
                     it.musicResponsiveListItemFlexColumnRenderer.isArtist()
-                }.apply {
-                    Logger.w(
-                        "PlaylistParser",
-                        "Artists after filter: ${this.map {
-                            it.musicResponsiveListItemFlexColumnRenderer.text
-                                ?.runs
-                                ?.firstOrNull()
-                                ?.text
-                        }}",
-                    )
                 }.mapNotNull { it.musicResponsiveListItemFlexColumnRenderer.toArtist() },
         album =
             flexColumns

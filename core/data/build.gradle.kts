@@ -42,6 +42,9 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // Napier uses Android logging on the repository IO dispatcher.
+    testOptions.unitTests.isReturnDefaultValues = true
+
     room {
         schemaDirectory("$projectDir/schemas")
     }
@@ -75,6 +78,11 @@ dependencies {
 
     // Media3
     implementation(project(":media3"))
+    testImplementation(libs.junit)
+    testImplementation(libs.ktor.client.mock)
+    testImplementation(libs.ktor.client.content.negotiation)
+    testImplementation(libs.ktor.serialization.kotlinx.json)
+    testImplementation("org.mockito:mockito-core:5.20.0")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.espresso.core)
     androidTestImplementation(libs.material)

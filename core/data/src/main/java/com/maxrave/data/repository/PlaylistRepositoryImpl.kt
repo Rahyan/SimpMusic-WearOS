@@ -8,6 +8,7 @@ import com.maxrave.data.extension.getFullDataFromDB
 import com.maxrave.data.mapping.toListTrack
 import com.maxrave.data.mapping.toTrack
 import com.maxrave.data.mapping.toYouTubeWatchEndpoint
+import com.maxrave.data.parser.loadOfflinePlaylistPages
 import com.maxrave.data.parser.parseLibraryPlaylist
 import com.maxrave.data.parser.parseNextLibraryPlaylist
 import com.maxrave.data.parser.parsePlaylistData
@@ -30,7 +31,6 @@ import com.maxrave.kotlinytmusicscraper.models.SectionListRenderer
 import com.maxrave.kotlinytmusicscraper.models.SongItem
 import com.maxrave.kotlinytmusicscraper.models.WatchEndpoint
 import com.maxrave.kotlinytmusicscraper.models.response.BrowseResponse
-import com.maxrave.kotlinytmusicscraper.pages.NextPage
 import com.maxrave.kotlinytmusicscraper.parser.getPlaylistContinuation
 import com.maxrave.kotlinytmusicscraper.parser.getPlaylistRadioEndpoint
 import com.maxrave.kotlinytmusicscraper.parser.getPlaylistShuffleEndpoint
@@ -316,33 +316,6 @@ internal class PlaylistRepositoryImpl(
                 youTube
                     .customQuery(browseId = id, setLogin = true)
                     .onSuccess { result ->
-                        val listContent: ArrayList<Track> = arrayListOf()
-                        val data: List<MusicShelfRenderer.Content>? =
-                            result.contents
-                                ?.singleColumnBrowseResultsRenderer
-                                ?.tabs
-                                ?.get(
-                                    0,
-                                )?.tabRenderer
-                                ?.content
-                                ?.sectionListRenderer
-                                ?.contents
-                                ?.get(
-                                    0,
-                                )?.musicPlaylistShelfRenderer
-                                ?.contents
-                                ?: result.contents
-                                    ?.twoColumnBrowseResultsRenderer
-                                    ?.secondaryContents
-                                    ?.sectionListRenderer
-                                    ?.contents
-                                    ?.get(0)
-                                    ?.musicPlaylistShelfRenderer
-                                    ?.contents
-                        if (data != null) {
-                            Logger.d("getPlaylistData", "data: $data")
-                            Logger.d("getPlaylistData", "data size: ${data.size}")
-                        }
                         val header =
                             result.header?.musicDetailHeaderRenderer
                                 ?: result.header?.musicEditablePlaylistDetailHeaderRenderer
@@ -368,7 +341,6 @@ internal class PlaylistRepositoryImpl(
                                     ?.musicEditablePlaylistDetailHeaderRenderer
                                     ?.header
                                     ?.musicResponsiveHeaderRenderer
-                        Logger.d("getPlaylistData", "header: $header")
                         val countTexts = when (header) {
                             is BrowseResponse.Header.MusicDetailHeaderRenderer ->
                                 header.secondSubtitle.runs?.map { it.text }
@@ -380,27 +352,17 @@ internal class PlaylistRepositoryImpl(
                             else -> null
                         }
                         val reportedCount = countTexts?.let { if (it.size >= 5) it.getOrNull(2) else it.firstOrNull() }
-                        var completeRows = true
-                        listContent.addAll(com.maxrave.common.collectPlaylistPages<Track>(
-                            initial = emptyList(), firstToken = result.getPlaylistContinuation(),
-                        ) { token ->
-                            val values = youTube.customQuery(browseId = null, continuation = token, setLogin = true).getOrThrow()
-                            val pages = values.onResponseReceivedActions?.mapNotNull { it.appendContinuationItemsAction?.continuationItems }
-                            val rows = pages?.flatten().orEmpty()
-                            if (pages.isNullOrEmpty()) completeRows = false
-                            val tracks = rows.mapNotNull { item ->
-                                    item.musicResponsiveListItemRenderer?.let { renderer ->
-                                        NextPage.fromMusicResponsiveListItemRenderer(renderer)?.toTrack()
-                                    }
-                                }
-                            if (rows.count { it.continuationItemRenderer == null } != tracks.size) completeRows = false
-                            tracks to values.getPlaylistContinuation()
-                        })
-                        Logger.d("getPlaylistData", "playlist final data: ${listContent.size}")
-                        parsePlaylistData(header, data ?: emptyList(), playlistId, context)?.let { playlist ->
-                            val allTracks = playlist.tracks + listContent
-                            val initialRows = data.orEmpty().count { it.continuationItemRenderer == null }
-                            val complete = data != null && completeRows && initialRows == playlist.tracks.size &&
+                        val pages = result.loadOfflinePlaylistPages(playlistId) { token ->
+                            youTube.customQuery(browseId = null, continuation = token, setLogin = true).getOrThrow()
+                        }
+                        parsePlaylistData(header, pages.initialRows, playlistId, context)?.let { playlist ->
+                            val allTracks = playlist.tracks + pages.appendedTracks
+                            val initialVideoIdsMatch = pages.initialRows.zip(playlist.tracks).all { (row, track) ->
+                                val entryVideoId = row.musicResponsiveListItemRenderer?.playlistItemData?.videoId
+                                entryVideoId == null || entryVideoId == track.videoId
+                            }
+                            val complete = pages.isComplete && pages.initialRows.size == playlist.tracks.size &&
+                                initialVideoIdsMatch &&
                                 allTracks.all { it.videoId.isNotBlank() && it.title.isNotBlank() } &&
                                 matchesReportedPlaylistCount(reportedCount, allTracks.size)
                             emit(
