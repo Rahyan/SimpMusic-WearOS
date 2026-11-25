@@ -61,7 +61,7 @@ jobs:
         run: ./gradlew --no-daemon --no-configuration-cache :wearApp:clean :companionApp:clean :app:assembleFossDebug :wearApp:assembleDebug :wearApp:assembleDebugAndroidTest :wearApp:assembleRelease :companionApp:assembleDebug :companionApp:assembleDebugAndroidTest :companionApp:assembleRelease
 
       - name: Run unit tests
-        run: ./gradlew --no-daemon --no-configuration-cache :domain:testDebugUnitTest :common:testDebugUnitTest :app:testFossDebugUnitTest :wearApp:testDebugUnitTest :companionApp:testDebugUnitTest :kotlinYtmusicScraper:testDebugUnitTest
+        run: ./gradlew --no-daemon --no-configuration-cache :domain:testDebugUnitTest :common:testDebugUnitTest :data:testDebugUnitTest :app:testFossDebugUnitTest :wearApp:testDebugUnitTest :companionApp:testDebugUnitTest :kotlinYtmusicScraper:testDebugUnitTest
 
       - name: Verify watch native payload isolation
         run: |
